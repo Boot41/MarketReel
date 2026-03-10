@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.agent import run_agent
+from app import agent
 
 app = FastAPI(title="MarketLogic ADK", version="1.0.0")
 
@@ -27,7 +27,7 @@ async def health() -> dict[str, str]:
 @app.post("/v1/run", response_model=RunResponse)
 async def run(request: RunRequest) -> RunResponse:
     try:
-        reply, session_id = await run_agent(
+        reply, session_id = await agent.run_agent(
             message=request.message,
             user_id=request.user_id,
             session_id=request.session_id,
