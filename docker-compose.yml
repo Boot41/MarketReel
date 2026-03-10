@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: app_scaffold
+      POSTGRES_DB: marketreeldb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -14,11 +14,12 @@ services:
     build: ./server
     environment:
       ENV: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/app_scaffold
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/marketreeldb
       SECRET_KEY: app-scaffold-secret-change-in-prod
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GOOGLE_GENAI_USE_VERTEXAI: "false"
       ADK_BASE_URL: http://adk:8011
+      ADK_API_KEY: ${ADK_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -29,9 +30,10 @@ services:
     build: ./adk-server
     environment:
       ENV: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/app_scaffold
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/marketreeldb
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GOOGLE_GENAI_USE_VERTEXAI: "false"
+      ADK_API_KEY: ${ADK_API_KEY:-}
     ports:
       - "8011:8011"
     depends_on:

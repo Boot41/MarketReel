@@ -15,7 +15,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 class Settings(BaseSettings):
     env: Literal["development", "test", "production"] = "development"
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5433/app_scaffold"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5433/marketreeldb"
     secret_key: str = "app-scaffold-dev-secret"
     google_api_key: str = ""
     google_genai_use_vertexai: bool = False
