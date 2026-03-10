@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: backend-gates
+        name: backend-gates
+        entry: bash -c 'cd server && uv run ruff format --check . && uv run ruff check . && uv run mypy . && uv run lint-imports && uv run pytest tests/unit -q'
+        language: system
+        pass_filenames: false
+        files: ^server/

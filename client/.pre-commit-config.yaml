@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: frontend-gates
+        name: frontend-gates
+        entry: bash -c 'cd client && npm run lint && npm run build'
+        language: system
+        pass_filenames: false
+        files: ^client/
