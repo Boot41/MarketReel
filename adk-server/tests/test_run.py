@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app import agent  # noqa: E402
-from app.main import app  # noqa: E402
+from app import main  # noqa: E402
 
 
 @pytest.mark.asyncio
@@ -20,14 +20,31 @@ async def test_run_endpoint(monkeypatch):
 
     monkeypatch.setattr(agent, "run_agent", _fake_run)
 
-    transport = ASGITransport(app=app)
+    monkeypatch.setattr(main.settings, "adk_api_key", "test-key")
+
+    transport = ASGITransport(app=main.app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/v1/run",
             json={"message": "Hello", "user_id": "u1", "session_id": None},
+            headers={"X-ADK-API-Key": "test-key"},
         )
 
     assert response.status_code == 200
     data = response.json()
     assert data["reply"] == "Echo: Hello"
     assert data["session_id"] == "sess-1"
+
+
+@pytest.mark.asyncio
+async def test_run_requires_api_key(monkeypatch):
+    monkeypatch.setattr(main.settings, "adk_api_key", "test-key")
+
+    transport = ASGITransport(app=main.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/v1/run",
+            json={"message": "Hello", "user_id": "u1", "session_id": None},
+        )
+
+    assert response.status_code == 401

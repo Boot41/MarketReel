@@ -16,8 +16,9 @@ class AdkRunResult:
 async def run_adk(message: str, user_id: str, session_id: str | None) -> AdkRunResult:
     settings = get_settings()
     payload = {"message": message, "user_id": user_id, "session_id": session_id}
+    headers = {"X-ADK-API-Key": settings.adk_api_key}
     async with httpx.AsyncClient(base_url=settings.adk_base_url, timeout=30.0) as client:
-        response = await client.post("/v1/run", json=payload)
+        response = await client.post("/v1/run", json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()
 
