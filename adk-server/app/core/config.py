@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     google_genai_use_vertexai: bool = False
     adk_api_key: str = ""
+    internal_api_key: str = ""
+    backend_base_url: str = "http://localhost:8010"
+    internal_api_timeout_sec: float = 8.0
+    internal_api_retries: int = 2
     app_name: str = "marketlogic_adk"
     adk_model: str = "gemini-2.5-flash"
 

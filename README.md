@@ -97,7 +97,8 @@ From `server/`, run:
 uv run python scripts/seed_marketlogic.py
 ```
 
-This loads mock datasets from `server/app/db/seed_data/` and prints inserted counts.
+This loads MarketLogic datasets from `seed.txt` (repo root), prints inserted counts,
+and performs a full reset of MarketLogic domain tables before inserting fresh data.
 
 ## Environment Setup
 
@@ -106,6 +107,7 @@ This loads mock datasets from `server/app/db/seed_data/` and prints inserted cou
    - `SECRET_KEY` for JWT signing
    - `GOOGLE_API_KEY` for Google GenAI access (ADK server)
    - `ADK_API_KEY` shared between backend and ADK server
+   - `INTERNAL_API_KEY` shared between adk-server and backend `/internal/v1/*`
 
 Example:
 ```
@@ -116,6 +118,9 @@ GOOGLE_API_KEY=your-google-key
 GOOGLE_GENAI_USE_VERTEXAI=false
 ADK_BASE_URL=http://localhost:8011
 ADK_API_KEY=your-shared-service-key
+BACKEND_BASE_URL=http://localhost:8010
+INTERNAL_API_KEY=your-internal-shared-key
+INTERNAL_API_NEXT_KEY=
 APP_NAME=marketlogic_adk
 ADK_MODEL=gemini-2.5-flash
 VITE_API_BASE_URL=http://localhost:8010
@@ -147,6 +152,7 @@ npm run build   # TypeScript + Vite build
 | POST | `/auth/login` | No | Returns JWT token |
 | POST | `/api/v1/agent/run` | Bearer | Run the ADK agent via backend |
 | * | `/api/v1/*` | Bearer | Protected routes (add yours here) |
+| * | `/internal/v1/*` | `X-Internal-API-Key` | Internal-only service endpoints for ADK tools |
 
 ## API Endpoints (ADK Server)
 
@@ -165,6 +171,9 @@ npm run build   # TypeScript + Vite build
 | `GOOGLE_API_KEY` | *(empty)* | Google AI Studio API key for ADK |
 | `GOOGLE_GENAI_USE_VERTEXAI` | `false` | Set `true` to use Vertex AI instead |
 | `ADK_API_KEY` | *(empty)* | Service key for backend → ADK server calls |
+| `BACKEND_BASE_URL` | `http://localhost:8010` | adk-server target backend URL for internal tools |
+| `INTERNAL_API_KEY` | *(empty)* | Service key for adk-server → backend internal calls |
+| `INTERNAL_API_NEXT_KEY` | *(empty)* | Optional key rotation slot accepted by backend |
 
 ## Docker
 

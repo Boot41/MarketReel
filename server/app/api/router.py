@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.api.routes import agent, auth, chats, health
+from app.api.routes import agent, auth, chats, health, internal
 from app.auth.deps import require_user
 
 public_router = APIRouter()
@@ -16,3 +16,4 @@ api_router.include_router(chats.router)
 root_router = APIRouter()
 root_router.include_router(public_router)
 root_router.include_router(api_router)
+root_router.include_router(internal.router)

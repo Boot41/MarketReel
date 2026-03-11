@@ -1,0 +1,158 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from agents.marketlogic import orchestrator  # noqa: E402
+from agents.marketlogic.sub_agents import data_agent as data_agent_module  # noqa: E402
+from agents.marketlogic.sub_agents import document_retrieval_agent as retrieval_module  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_run_data_agent_expands_when_initial_fetch_is_insufficient(monkeypatch: pytest.MonkeyPatch):
+    calls: list[dict[str, Any]] = []
+
+    def _fake_navigator(movie: str, territory: str, intent: str) -> dict[str, Any]:
+        return {
+            "movie": movie,
+            "territory": territory,
+            "intent": intent,
+            "doc_types": ["reviews"],
+            "max_docs": 2,
+            "max_scenes": 1,
+        }
+
+    def _fake_fetcher(plan: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+        calls.append(dict(plan))
+        if int(plan.get("max_docs", 0)) <= 2:
+            return {"documents": [{"doc_id": "d1", "source_path": "reviews/a.md", "text": "x"}], "scenes": []}
+        return {
+            "documents": [
+                {"doc_id": "d1", "source_path": "reviews/a.md", "text": "x"},
+                {"doc_id": "d2", "source_path": "reviews/b.md", "text": "y"},
+                {"doc_id": "d3", "source_path": "reviews/c.md", "text": "z"},
+            ],
+            "scenes": [{"doc_id": "s1", "source_path": "scripts/a.md", "text": "scene"}],
+        }
+
+    monkeypatch.setattr(retrieval_module, "IndexNavigator", _fake_navigator)
+    monkeypatch.setattr(retrieval_module, "TargetedFetcher", _fake_fetcher)
+    monkeypatch.setattr(
+        data_agent_module,
+        "source_citation_tool",
+        lambda items: [{"source_path": item["source_path"]} for item in items],
+    )
+
+    bundle = await orchestrator.run_data_agent(
+        {
+            "movie": "Interstellar",
+            "territory": "India",
+            "intent": "risk",
+            "needs_docs": True,
+            "needs_db": False,
+        }
+    )
+
+    assert len(calls) == 2
+    assert calls[0]["max_docs"] == 2
+    assert calls[1]["max_docs"] > calls[0]["max_docs"]
+    assert bundle["data_sufficiency_score"] >= 0.5
+    assert len(bundle["citations"]) == 4
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_reuses_session_artifacts_for_strategy_followup(monkeypatch: pytest.MonkeyPatch):
+    async def _unexpected_run_data_agent(_: dict[str, Any]) -> dict[str, Any]:
+        raise AssertionError("run_data_agent should not be called for scenario follow-up reuse")
+
+    async def _unexpected_run_risk_agent(_: dict[str, Any]) -> list[dict[str, Any]]:
+        raise AssertionError("run_risk_agent should not be called for scenario follow-up reuse")
+
+    async def _unexpected_run_valuation_agent(_: dict[str, Any], __: list[dict[str, Any]]) -> dict[str, Any]:
+        raise AssertionError("run_valuation_agent should not be called for scenario follow-up reuse")
+
+    monkeypatch.setattr(orchestrator, "run_data_agent", _unexpected_run_data_agent)
+    monkeypatch.setattr(orchestrator, "run_risk_agent", _unexpected_run_risk_agent)
+    monkeypatch.setattr(orchestrator, "run_valuation_agent", _unexpected_run_valuation_agent)
+
+    session_state = {
+        "resolved_context": {
+            "movie": "Interstellar",
+            "territory": "India",
+            "intent": "full_scorecard",
+            "scenario_override": None,
+        },
+        "evidence_bundle": {
+            "movie": "Interstellar",
+            "territory": "India",
+            "intent": "full_scorecard",
+            "document_evidence": {"documents": [], "scenes": []},
+            "db_evidence": {
+                "theatrical_windows": [{"window_type": "standard", "days": 42}],
+                "exchange_rates": {"currency_code": "INR", "rate_to_usd": 83.0},
+            },
+            "citations": [{"source_path": "docs/reviews/interstellar.md", "doc_id": "r1", "page": 1, "excerpt": "good"}],
+            "data_sufficiency_score": 0.7,
+        },
+        "risk": [
+            {
+                "category": "MARKET",
+                "severity": "LOW",
+                "scene_ref": "market_baseline",
+                "source_ref": "derived:baseline",
+                "mitigation": "Baseline checks.",
+                "confidence": 0.5,
+            }
+        ],
+        "valuation": {
+            "mg_estimate_usd": 1000000.0,
+            "confidence_interval_low_usd": 800000.0,
+            "confidence_interval_high_usd": 1200000.0,
+            "theatrical_projection_usd": 2200000.0,
+            "vod_projection_usd": 900000.0,
+            "comparable_films": ["X"],
+            "sufficiency_score": 0.7,
+        },
+    }
+
+    scorecard, state_delta = await orchestrator.run_marketlogic_orchestrator(
+        message="If we skip theatrical and go straight to streaming, how does ROI change?",
+        session_state=session_state,
+        provider_enabled=False,
+    )
+
+    assert scorecard["release_timeline"]["release_mode"] == "streaming_first"
+    assert state_delta["resolved_context"]["movie"] == "Interstellar"
+    assert state_delta["resolved_context"]["territory"] == "India"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_handles_small_talk_without_workflow() -> None:
+    reply, state_delta = await orchestrator.run_marketlogic_orchestrator(
+        message="hi",
+        session_state={},
+        provider_enabled=False,
+    )
+
+    assert isinstance(reply, str)
+    assert "movie and territory" in reply.lower()
+    assert state_delta["last_agent_response_type"] == "respond_directly"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_asks_for_missing_context_on_analytic_prompt() -> None:
+    reply, state_delta = await orchestrator.run_marketlogic_orchestrator(
+        message="Should we acquire this?",
+        session_state={},
+        provider_enabled=False,
+    )
+
+    assert isinstance(reply, str)
+    assert "movie title and target territory" in reply
+    assert state_delta["last_agent_response_type"] == "ask_clarification"

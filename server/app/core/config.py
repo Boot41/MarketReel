@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     google_genai_use_vertexai: bool = False
     adk_base_url: str = "http://localhost:8011"
     adk_api_key: str = ""
+    internal_api_key: str = ""
+    internal_api_next_key: str = ""
 
     @property
     def effective_db_url(self) -> str:
