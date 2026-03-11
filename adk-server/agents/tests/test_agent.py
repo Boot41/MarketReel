@@ -130,3 +130,29 @@ async def test_orchestrator_reuses_session_artifacts_for_strategy_followup(monke
     assert scorecard["release_timeline"]["release_mode"] == "streaming_first"
     assert state_delta["resolved_context"]["movie"] == "Interstellar"
     assert state_delta["resolved_context"]["territory"] == "India"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_handles_small_talk_without_workflow() -> None:
+    reply, state_delta = await orchestrator.run_marketlogic_orchestrator(
+        message="hi",
+        session_state={},
+        provider_enabled=False,
+    )
+
+    assert isinstance(reply, str)
+    assert "movie and territory" in reply.lower()
+    assert state_delta["last_agent_response_type"] == "respond_directly"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_asks_for_missing_context_on_analytic_prompt() -> None:
+    reply, state_delta = await orchestrator.run_marketlogic_orchestrator(
+        message="Should we acquire this?",
+        session_state={},
+        provider_enabled=False,
+    )
+
+    assert isinstance(reply, str)
+    assert "movie title and target territory" in reply
+    assert state_delta["last_agent_response_type"] == "ask_clarification"

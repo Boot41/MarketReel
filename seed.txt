@@ -1,0 +1,918 @@
+-- ============================================================
+-- MarketLogic AI System — PostgreSQL Seed Data
+-- Films: Avengers Endgame, Deadpool, Dunkirk, Ford v Ferrari,
+--        How to Train Your Dragon, Inside Out, Interstellar,
+--        La La Land, The Lion King, Tenet
+-- ============================================================
+
+-- ============================================================
+-- SCHEMA CREATION
+-- ============================================================
+
+-- 1. Films master table
+CREATE TABLE IF NOT EXISTS films (
+    film_id         SERIAL PRIMARY KEY,
+    title           VARCHAR(200) NOT NULL,
+    year            INTEGER,
+    genre           VARCHAR(100),
+    subgenre        VARCHAR(100),
+    director        VARCHAR(150),
+    production_budget_usd BIGINT,
+    mpaa_rating     VARCHAR(10),
+    runtime_minutes INTEGER,
+    language        VARCHAR(50) DEFAULT 'English',
+    studio          VARCHAR(150),
+    distributor     VARCHAR(150),
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 2. Global box office performance by genre and territory
+CREATE TABLE IF NOT EXISTS box_office_performance (
+    id              SERIAL PRIMARY KEY,
+    film_id         INTEGER REFERENCES films(film_id),
+    territory       VARCHAR(100),
+    territory_code  CHAR(2),
+    opening_weekend_usd BIGINT,
+    total_gross_usd BIGINT,
+    weeks_in_release INTEGER,
+    screens_count   INTEGER,
+    avg_ticket_price_usd NUMERIC(6,2),
+    market_share_pct NUMERIC(5,2),
+    release_date    DATE,
+    distributor_local VARCHAR(150),
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 3. Actor Q-scores and social media reach
+CREATE TABLE IF NOT EXISTS actor_metrics (
+    actor_id        SERIAL PRIMARY KEY,
+    name            VARCHAR(150) NOT NULL,
+    nationality     VARCHAR(100),
+    q_score_us      NUMERIC(5,2),       -- 0-100 familiarity/appeal composite
+    q_score_global  NUMERIC(5,2),
+    instagram_followers_m NUMERIC(6,2), -- millions
+    twitter_followers_m   NUMERIC(6,2),
+    tiktok_followers_m    NUMERIC(6,2),
+    youtube_subscribers_m NUMERIC(6,2),
+    google_search_index   INTEGER,      -- relative search interest 0-100
+    award_wins      INTEGER DEFAULT 0,
+    award_nominations INTEGER DEFAULT 0,
+    franchise_value_usd BIGINT,         -- estimated box office pull
+    last_updated    DATE
+);
+
+-- 4. Film-Actor mapping
+CREATE TABLE IF NOT EXISTS film_cast (
+    id              SERIAL PRIMARY KEY,
+    film_id         INTEGER REFERENCES films(film_id),
+    actor_id        INTEGER REFERENCES actor_metrics(actor_id),
+    role_type       VARCHAR(50),   -- lead, supporting, cameo
+    billing_order   INTEGER
+);
+
+-- 5. Regional theatrical window trends
+CREATE TABLE IF NOT EXISTS theatrical_window_trends (
+    id              SERIAL PRIMARY KEY,
+    territory       VARCHAR(100),
+    territory_code  CHAR(2),
+    year            INTEGER,
+    avg_theatrical_window_days INTEGER,  -- days before VOD/digital
+    premium_vod_window_days    INTEGER,
+    streaming_window_days      INTEGER,
+    theatrical_revenue_share_pct NUMERIC(5,2),
+    vod_revenue_share_pct       NUMERIC(5,2),
+    streaming_revenue_share_pct NUMERIC(5,2),
+    avg_screens_per_film        INTEGER,
+    yoy_admissions_change_pct   NUMERIC(5,2),
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 6. Currency exchange rates
+CREATE TABLE IF NOT EXISTS currency_exchange_rates (
+    id              SERIAL PRIMARY KEY,
+    currency_code   CHAR(3),
+    currency_name   VARCHAR(100),
+    territory       VARCHAR(100),
+    usd_rate        NUMERIC(12,6),   -- 1 USD = X local currency
+    eur_rate        NUMERIC(12,6),
+    rate_date       DATE,
+    volatility_index NUMERIC(5,2),  -- annualized FX volatility %
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 7. VOD/Streaming licensing price benchmarks
+CREATE TABLE IF NOT EXISTS vod_licensing_benchmarks (
+    id              SERIAL PRIMARY KEY,
+    film_id         INTEGER REFERENCES films(film_id),
+    platform        VARCHAR(100),   -- Netflix, Prime, Hulu, Disney+, etc.
+    territory       VARCHAR(100),
+    license_fee_usd BIGINT,
+    deal_type       VARCHAR(50),    -- exclusive, non-exclusive, windowed
+    license_term_months INTEGER,
+    revenue_share_pct NUMERIC(5,2),
+    streams_projected INTEGER,
+    avg_revenue_per_stream_usd NUMERIC(6,4),
+    deal_date       DATE,
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 8. Festival performance & awards
+CREATE TABLE IF NOT EXISTS festival_performance (
+    id              SERIAL PRIMARY KEY,
+    film_id         INTEGER REFERENCES films(film_id),
+    festival_name   VARCHAR(150),
+    festival_year   INTEGER,
+    award_category  VARCHAR(150),
+    award_result    VARCHAR(50),    -- won, nominated, screened, special mention
+    audience_score  NUMERIC(4,1),  -- out of 10
+    critic_score    NUMERIC(4,1),
+    buzz_score      INTEGER,       -- social mentions index 0-100
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 9. Genre-territory revenue benchmarks (historical averages)
+CREATE TABLE IF NOT EXISTS genre_territory_benchmarks (
+    id              SERIAL PRIMARY KEY,
+    genre           VARCHAR(100),
+    territory       VARCHAR(100),
+    territory_code  CHAR(2),
+    avg_opening_weekend_usd BIGINT,
+    avg_total_gross_usd     BIGINT,
+    avg_multiplier          NUMERIC(4,2),  -- total/opening ratio
+    sample_size             INTEGER,
+    year_range_start        INTEGER,
+    year_range_end          INTEGER,
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 10. Marketing spend vs. revenue analysis
+CREATE TABLE IF NOT EXISTS marketing_performance (
+    id              SERIAL PRIMARY KEY,
+    film_id         INTEGER REFERENCES films(film_id),
+    territory       VARCHAR(100),
+    p_and_a_spend_usd BIGINT,      -- prints & advertising
+    digital_spend_usd BIGINT,
+    tv_spend_usd    BIGINT,
+    outdoor_spend_usd BIGINT,
+    social_spend_usd  BIGINT,
+    revenue_generated_usd BIGINT,
+    roi_pct         NUMERIC(6,2),
+    campaign_type   VARCHAR(100),
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 11. Censorship & content restriction flags
+CREATE TABLE IF NOT EXISTS censorship_risk_flags (
+    id              SERIAL PRIMARY KEY,
+    film_id         INTEGER REFERENCES films(film_id),
+    territory       VARCHAR(100),
+    territory_code  CHAR(2),
+    risk_level      VARCHAR(20),   -- low, medium, high, banned
+    content_type    VARCHAR(100),  -- violence, nudity, political, religious, etc.
+    description     TEXT,
+    required_cuts   BOOLEAN DEFAULT FALSE,
+    rating_assigned VARCHAR(20),
+    approved        BOOLEAN,
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 12. Acquisition deal history (comparable deals)
+CREATE TABLE IF NOT EXISTS acquisition_deals (
+    id              SERIAL PRIMARY KEY,
+    film_id         INTEGER REFERENCES films(film_id),
+    territory       VARCHAR(100),
+    deal_type       VARCHAR(50),       -- theatrical, all-rights, split-rights
+    minimum_guarantee_usd BIGINT,
+    advance_usd     BIGINT,
+    recoupment_threshold_usd BIGINT,
+    backend_pct     NUMERIC(5,2),
+    acquirer        VARCHAR(150),
+    deal_date       DATE,
+    outcome         VARCHAR(50),       -- profitable, breakeven, loss
+    actual_revenue_usd BIGINT,
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================================
+-- DATA INSERTION
+-- ============================================================
+
+-- ============================================================
+-- TABLE: films
+-- ============================================================
+INSERT INTO films (title, year, genre, subgenre, director, production_budget_usd, mpaa_rating, runtime_minutes, language, studio, distributor) VALUES
+('Avengers: Endgame',    2019, 'Action',   'Superhero',      'Anthony Russo, Joe Russo', 356000000,  'PG-13', 181, 'English', 'Marvel Studios',        'Walt Disney Pictures'),
+('Deadpool',             2016, 'Action',   'Superhero Comedy','Tim Miller',              58000000,   'R',     108, 'English', '20th Century Fox',      '20th Century Fox'),
+('Dunkirk',              2017, 'Drama',    'War Historical',  'Christopher Nolan',       100000000,  'PG-13', 106, 'English', 'Syncopy',               'Warner Bros. Pictures'),
+('Ford v Ferrari',       2019, 'Drama',    'Sports Biography','James Mangold',           98000000,   'PG-13', 152, 'English', 'Chernin Entertainment', '20th Century Fox'),
+('How to Train Your Dragon', 2010, 'Animation', 'Adventure Fantasy', 'Dean DeBlois, Chris Sanders', 165000000, 'PG', 98, 'English', 'DreamWorks Animation', 'Paramount Pictures'),
+('Inside Out',           2015, 'Animation','Family Comedy',   'Pete Docter',             175000000,  'PG',    95,  'English', 'Pixar Animation Studios','Walt Disney Pictures'),
+('Interstellar',         2014, 'Sci-Fi',   'Space Drama',     'Christopher Nolan',       165000000,  'PG-13', 169, 'English', 'Legendary Entertainment','Paramount Pictures'),
+('La La Land',           2016, 'Drama',    'Musical Romance', 'Damien Chazelle',         30000000,   'PG-13', 128, 'English', 'Summit Entertainment',  'Lionsgate Films'),
+('The Lion King',        2019, 'Animation','Family Adventure','Jon Favreau',             260000000,  'PG',    118, 'English', 'Walt Disney Pictures',  'Walt Disney Pictures'),
+('Tenet',                2020, 'Sci-Fi',   'Action Thriller', 'Christopher Nolan',       200000000,  'PG-13', 150, 'English', 'Syncopy',               'Warner Bros. Pictures');
+
+-- ============================================================
+-- TABLE: box_office_performance
+-- ============================================================
+INSERT INTO box_office_performance (film_id, territory, territory_code, opening_weekend_usd, total_gross_usd, weeks_in_release, screens_count, avg_ticket_price_usd, market_share_pct, release_date, distributor_local) VALUES
+-- Avengers: Endgame (film_id=1)
+(1,'United States',   'US', 357115007, 858373000,  12, 4662, 10.92, 42.5, '2019-04-26', 'Walt Disney Pictures'),
+(1,'China',           'CN', 330540000, 629220000,  10, 8923, 9.10,  31.2, '2019-04-24', 'Disney China'),
+(1,'United Kingdom',  'GB', 43250000,  114080000,   9, 1420, 13.50, 22.1, '2019-04-25', 'Walt Disney Studios'),
+(1,'Germany',         'DE', 18750000,   52400000,   8, 980,  12.80, 18.5, '2019-04-25', 'Walt Disney Germany'),
+(1,'France',          'FR', 20100000,   57300000,   8, 1050, 13.20, 20.3, '2019-04-24', 'Walt Disney France'),
+(1,'Japan',           'JP', 22600000,   81500000,  11, 850,  14.50, 14.2, '2019-04-26', 'Walt Disney Japan'),
+(1,'South Korea',     'KR', 35900000,  113800000,   9, 2150, 10.80, 38.4, '2019-04-24', 'Walt Disney Korea'),
+(1,'Brazil',          'BR', 18700000,   54200000,   8, 1230, 6.50,  28.7, '2019-04-25', 'Disney Brazil'),
+(1,'Mexico',          'MX', 14200000,   41800000,   8, 980,  5.80,  26.4, '2019-04-25', 'Disney Mexico'),
+(1,'Australia',       'AU', 12900000,   37600000,   8, 710,  14.20, 30.2, '2019-04-25', 'Disney Australia'),
+(1,'Russia',          'RU', 11200000,   31400000,   7, 720,  6.20,  19.8, '2019-04-29', 'Disney Russia'),
+(1,'India',           'IN', 31800000,   96500000,  10, 2650, 4.20,  21.5, '2019-04-26', 'Disney India'),
+(1,'Italy',           'IT', 9800000,    28600000,   7, 780,  10.90, 17.6, '2019-04-24', 'Walt Disney Italy'),
+(1,'Spain',           'ES', 11400000,   33200000,   8, 850,  9.80,  19.3, '2019-04-25', 'Walt Disney Spain'),
+(1,'Latin America',   'LA', 38400000,  112000000,   9, 4200, 5.20,  24.6, '2019-04-25', 'Disney Intl'),
+
+-- Deadpool (film_id=2)
+(2,'United States',   'US', 132434639, 363070709,  12, 3856, 9.50,  31.4, '2016-02-12', '20th Century Fox'),
+(2,'China',           'CN', 0,          0,           0,    0, 0.00,   0.0, NULL,         NULL), -- banned
+(2,'United Kingdom',  'GB', 26400000,   83400000,  10, 1320, 12.80, 18.9, '2016-02-10', '20th Century Fox UK'),
+(2,'Germany',         'DE', 10200000,   34600000,   9, 890,  11.90, 14.2, '2016-02-11', 'Fox Germany'),
+(2,'France',          'FR', 11500000,   38200000,   9, 960,  12.50, 16.1, '2016-02-10', 'Fox France'),
+(2,'Japan',           'JP', 4200000,    14800000,   7, 520,  13.80, 6.4,  '2016-05-01', 'Fox Japan'),
+(2,'South Korea',     'KR', 9800000,    31200000,   8, 1650, 9.90,  21.7, '2016-02-17', 'Fox Korea'),
+(2,'Brazil',          'BR', 8200000,    26400000,   8, 890,  5.80,  19.4, '2016-02-11', 'Fox Brazil'),
+(2,'Australia',       'AU', 8100000,    26900000,   8, 620,  13.50, 24.1, '2016-02-11', 'Fox Australia'),
+(2,'Russia',          'RU', 5600000,    18200000,   7, 580,  5.80,  14.6, '2016-02-18', 'Fox Russia'),
+(2,'Mexico',          'MX', 7100000,    23400000,   8, 820,  5.40,  21.8, '2016-02-11', 'Fox Mexico'),
+
+-- Dunkirk (film_id=3)
+(3,'United States',   'US', 50516002,  190317488,  12, 3720, 10.80, 18.2, '2017-07-21', 'Warner Bros.'),
+(3,'United Kingdom',  'GB', 15200000,   56900000,  10, 1250, 13.10, 28.4, '2017-07-21', 'Warner Bros. UK'),
+(3,'France',          'FR', 13100000,   41800000,   9, 980,  12.80, 21.6, '2017-07-19', 'Warner Bros. France'),
+(3,'Germany',         'DE', 7800000,    23400000,   8, 840,  12.40, 14.8, '2017-07-27', 'Warner Bros. Germany'),
+(3,'Australia',       'AU', 4900000,    15800000,   7, 590,  13.90, 16.2, '2017-07-20', 'Warner Bros. AU'),
+(3,'China',           'CN', 29200000,   76800000,   8, 5640, 8.90,  12.4, '2017-09-01', 'Warner Bros. China'),
+(3,'Japan',           'JP', 3200000,    12100000,   7, 480,  14.20, 5.8,  '2017-09-09', 'Warner Bros. Japan'),
+(3,'South Korea',     'KR', 4800000,    15200000,   7, 920,  10.20, 12.1, '2017-07-26', 'Warner Bros. Korea'),
+
+-- Ford v Ferrari (film_id=4)
+(4,'United States',   'US', 31500000,  117620073,  10, 3528, 10.90, 11.4, '2019-11-15', '20th Century Fox'),
+(4,'United Kingdom',  'GB', 8200000,   28900000,   9, 890,  12.90, 14.8, '2019-11-08', 'Fox UK'),
+(4,'France',          'FR', 6400000,   21600000,   8, 790,  12.50, 11.2, '2019-11-13', 'Fox France'),
+(4,'Germany',         'DE', 7900000,   26800000,   9, 850,  12.80, 13.7, '2019-11-14', 'Fox Germany'),
+(4,'Australia',       'AU', 3800000,   13200000,   7, 560,  13.80, 12.4, '2019-11-14', 'Fox Australia'),
+(4,'Japan',           'JP', 4100000,   14600000,   7, 490,  14.50, 8.2,  '2019-11-29', 'Fox Japan'),
+
+-- How to Train Your Dragon (film_id=5)
+(5,'United States',   'US', 43699485,  217581231,  16, 4060, 8.90,  15.6, '2010-03-26', 'Paramount Pictures'),
+(5,'China',           'CN', 7200000,   19400000,   6, 3200, 7.80,  4.8,  '2010-06-01', 'UPI China'),
+(5,'United Kingdom',  'GB', 11200000,   38400000,  12, 1180, 11.90, 19.4, '2010-04-02', 'Paramount UK'),
+(5,'Germany',         'DE', 9800000,   32600000,  11, 920,  11.40, 16.8, '2010-04-01', 'Paramount Germany'),
+(5,'France',          'FR', 10400000,   35200000,  12, 980,  11.80, 18.2, '2010-03-31', 'Paramount France'),
+(5,'Japan',           'JP', 5600000,   19800000,   9, 620,  13.20, 9.4,  '2010-06-19', 'Paramount Japan'),
+(5,'Australia',       'AU', 5200000,   18600000,   9, 580,  12.80, 17.2, '2010-04-01', 'Paramount Australia'),
+(5,'Brazil',          'BR', 4800000,   16200000,   8, 720,  5.20,  14.6, '2010-04-09', 'Paramount Brazil'),
+
+-- Inside Out (film_id=6)
+(6,'United States',   'US', 90440272,  356461711,  15, 3946, 10.20, 24.8, '2015-06-19', 'Walt Disney Pictures'),
+(6,'China',           'CN', 21300000,   58200000,   9, 4800, 8.60,  8.4,  '2015-10-06', 'Disney China'),
+(6,'United Kingdom',  'GB', 14200000,   49800000,  12, 1240, 12.80, 22.6, '2015-07-24', 'Disney UK'),
+(6,'Germany',         'DE', 11800000,   40600000,  11, 940,  12.20, 18.4, '2015-08-06', 'Disney Germany'),
+(6,'France',          'FR', 13400000,   46200000,  12, 1020, 12.60, 21.8, '2015-08-12', 'Disney France'),
+(6,'Japan',           'JP', 8400000,   28900000,   10, 680,  14.10, 12.6, '2015-07-18', 'Disney Japan'),
+(6,'South Korea',     'KR', 9200000,   31400000,   10, 1180, 9.80,  19.2, '2015-07-09', 'Disney Korea'),
+(6,'Brazil',          'BR', 7800000,   26800000,   9, 820,  5.40,  18.4, '2015-07-17', 'Disney Brazil'),
+(6,'Australia',       'AU', 6400000,   22200000,   9, 640,  13.40, 20.8, '2015-06-18', 'Disney Australia'),
+(6,'Mexico',          'MX', 7100000,   24400000,   9, 790,  5.20,  19.6, '2015-06-19', 'Disney Mexico'),
+
+-- Interstellar (film_id=7)
+(7,'United States',   'US', 47510360,  188020017,  12, 3572, 10.60, 14.8, '2014-11-07', 'Paramount Pictures'),
+(7,'China',           'CN', 68900000,  129000000,   9, 5820, 8.80,  18.2, '2014-11-12', 'Paramount China'),
+(7,'United Kingdom',  'GB', 14200000,   48600000,  10, 1180, 13.20, 19.4, '2014-11-07', 'Paramount UK'),
+(7,'Germany',         'DE', 12400000,   41800000,  10, 920,  12.90, 18.6, '2014-11-06', 'Paramount Germany'),
+(7,'France',          'FR', 13800000,   46400000,  11, 990,  13.10, 20.2, '2014-11-05', 'Paramount France'),
+(7,'Japan',           'JP', 9200000,   31200000,   9, 720,  14.60, 13.4, '2014-11-22', 'Paramount Japan'),
+(7,'South Korea',     'KR', 11800000,   38900000,   9, 1420, 10.20, 24.6, '2014-11-06', 'Paramount Korea'),
+(7,'Australia',       'AU', 5800000,   19800000,   8, 640,  14.10, 16.8, '2014-11-06', 'Paramount Australia'),
+(7,'Russia',          'RU', 6400000,   21600000,   8, 680,  6.40,  14.8, '2014-11-06', 'Paramount Russia'),
+
+-- La La Land (film_id=8)
+(8,'United States',   'US', 441120,   151101803,  24, 200,  11.20, 8.6,  '2016-12-09', 'Lionsgate'),
+(8,'China',           'CN', 10200000,  25800000,   7, 3920, 8.40,  5.2,  '2017-02-14', 'Lionsgate China'),
+(8,'United Kingdom',  'GB', 6800000,   32400000,  14, 860,  13.40, 12.6, '2017-01-13', 'Lionsgate UK'),
+(8,'France',          'FR', 8200000,   38600000,  15, 920,  13.20, 14.8, '2017-01-25', 'Lionsgate France'),
+(8,'Germany',         'DE', 5400000,   21800000,  11, 780,  12.80, 10.4, '2017-01-12', 'Lionsgate Germany'),
+(8,'Japan',           'JP', 4200000,   20400000,  10, 520,  14.80, 8.2,  '2017-02-24', 'Lionsgate Japan'),
+(8,'South Korea',     'KR', 6800000,   28400000,  12, 1020, 10.60, 16.4, '2017-02-09', 'Lionsgate Korea'),
+(8,'Australia',       'AU', 2800000,   12400000,   9, 480,  14.20, 9.8,  '2017-01-26', 'Lionsgate Australia'),
+
+-- The Lion King (film_id=9)
+(9,'United States',   'US', 191770759, 543638043,  14, 4802, 11.40, 36.4, '2019-07-19', 'Walt Disney Pictures'),
+(9,'China',           'CN', 53800000,  119200000,  10, 7840, 8.90,  16.8, '2019-07-12', 'Disney China'),
+(9,'United Kingdom',  'GB', 26400000,   84200000,  12, 1480, 13.80, 26.4, '2019-07-19', 'Disney UK'),
+(9,'Germany',         'DE', 14800000,   48600000,  11, 1020, 13.20, 20.2, '2019-07-17', 'Disney Germany'),
+(9,'France',          'FR', 16400000,   54800000,  12, 1120, 13.60, 22.8, '2019-07-17', 'Disney France'),
+(9,'Japan',           'JP', 12800000,   43200000,  11, 820,  15.20, 15.6, '2019-08-09', 'Disney Japan'),
+(9,'South Korea',     'KR', 14200000,   47800000,  11, 1920, 11.20, 28.4, '2019-07-17', 'Disney Korea'),
+(9,'Brazil',          'BR', 12400000,   41200000,  10, 1420, 6.40,  24.8, '2019-07-17', 'Disney Brazil'),
+(9,'Australia',       'AU', 9800000,   32800000,  10, 780,  14.60, 28.2, '2019-07-18', 'Disney Australia'),
+(9,'India',           'IN', 19200000,   54600000,  11, 2980, 4.60,  18.4, '2019-07-19', 'Disney India'),
+(9,'Latin America',   'LA', 32400000,   98400000,  11, 5200, 5.40,  22.6, '2019-07-19', 'Disney Intl'),
+
+-- Tenet (film_id=10)
+(10,'United States',  'US', 9270000,   58460174,  12, 2810, 11.40, 8.4,  '2020-09-03', 'Warner Bros.'),
+(10,'China',          'CN', 30100000,  66800000,   9, 6240, 9.20,  14.8, '2020-09-04', 'Warner Bros. China'),
+(10,'United Kingdom', 'GB', 7200000,   26400000,   9, 980,  13.60, 16.2, '2020-08-26', 'Warner Bros. UK'),
+(10,'Germany',        'DE', 5800000,   21200000,   8, 820,  13.20, 12.8, '2020-08-26', 'Warner Bros. Germany'),
+(10,'France',         'FR', 6400000,   23800000,   8, 880,  13.80, 14.2, '2020-08-26', 'Warner Bros. France'),
+(10,'Japan',          'JP', 4800000,   18400000,   8, 620,  15.40, 9.6,  '2020-09-18', 'Warner Bros. Japan'),
+(10,'South Korea',    'KR', 5600000,   20800000,   8, 1120, 11.20, 14.8, '2020-09-01', 'Warner Bros. Korea'),
+(10,'Australia',      'AU', 1800000,    6600000,   6, 380,  14.80, 8.2,  '2020-09-03', 'Warner Bros. AU'),
+(10,'Russia',         'RU', 7200000,   26400000,   8, 680,  6.60,  18.4, '2020-08-27', 'Warner Bros. Russia');
+
+-- ============================================================
+-- TABLE: actor_metrics
+-- ============================================================
+INSERT INTO actor_metrics (name, nationality, q_score_us, q_score_global, instagram_followers_m, twitter_followers_m, tiktok_followers_m, youtube_subscribers_m, google_search_index, award_wins, award_nominations, franchise_value_usd, last_updated) VALUES
+('Robert Downey Jr.',   'American',   94, 91, 14.8,  12.4,  8.2,  0.8, 88, 1,  6,  3200000000, '2024-01-01'),
+('Chris Evans',         'American',   88, 85, 28.4,  15.6,  5.4,  0.4, 76, 0,  2,  2400000000, '2024-01-01'),
+('Scarlett Johansson',  'American',   86, 84, 0,     0,     2.1,  0.2, 82, 0,  2,  2100000000, '2024-01-01'),
+('Josh Brolin',         'American',   72, 68, 0.8,   0.4,   0.6,  0.1, 54, 0,  2,  800000000,  '2024-01-01'),
+('Ryan Reynolds',       'Canadian',   91, 88, 46.8,  22.4,  18.6, 1.2, 86, 1,  8,  2800000000, '2024-01-01'),
+('Morena Baccarin',     'Brazilian',  64, 61, 6.2,   2.8,   1.4,  0.2, 48, 0,  1,  320000000,  '2024-01-01'),
+('Mark Ruffalo',        'American',   76, 72, 3.6,   5.4,   1.8,  0.2, 64, 1,  3,  900000000,  '2024-01-01'),
+('Fionn Whitehead',     'British',    42, 38, 0.2,   0.1,   0.4,  0.0, 28, 0,  1,  80000000,   '2024-01-01'),
+('Tom Hardy',           'British',    78, 76, 6.8,   3.2,   2.4,  0.2, 72, 1,  4,  1100000000, '2024-01-01'),
+('Mark Rylance',        'British',    58, 54, 0.1,   0.1,   0.2,  0.0, 48, 3,  8,  240000000,  '2024-01-01'),
+('Matt Damon',          'American',   83, 80, 0,     0,     1.2,  0.1, 78, 2,  7,  1600000000, '2024-01-01'),
+('Christian Bale',      'British',    79, 77, 0,     0,     1.8,  0.1, 74, 1,  5,  1400000000, '2024-01-01'),
+('Jay Baruchel',        'Canadian',   52, 44, 0.4,   0.2,   0.6,  0.0, 36, 0,  2,  280000000,  '2024-01-01'),
+('Gerard Butler',       'Scottish',   68, 64, 2.4,   1.2,   1.4,  0.1, 62, 0,  2,  520000000,  '2024-01-01'),
+('Amy Poehler',         'American',   72, 64, 1.8,   6.4,   1.2,  0.2, 66, 4, 12,  480000000,  '2024-01-01'),
+('Mindy Kaling',        'American',   68, 58, 4.8,   9.2,   2.4,  0.4, 64, 2,  8,  320000000,  '2024-01-01'),
+('Matthew McConaughey', 'American',   84, 80, 7.2,   2.8,   3.2,  0.2, 80, 1,  4,  1800000000, '2024-01-01'),
+('Anne Hathaway',       'American',   80, 77, 8.4,   6.4,   2.8,  0.2, 76, 1,  6,  1200000000, '2024-01-01'),
+('Jessica Chastain',    'American',   72, 68, 1.4,   1.2,   0.8,  0.1, 62, 1,  5,  640000000,  '2024-01-01'),
+('Ryan Gosling',        'Canadian',   82, 79, 0,     0,     4.2,  0.1, 78, 1,  5,  1400000000, '2024-01-01'),
+('Emma Stone',          'American',   86, 83, 0,     0,     3.8,  0.1, 80, 2,  6,  1600000000, '2024-01-01'),
+('John Legend',         'American',   76, 70, 12.4,  14.8,  4.2,  0.8, 70, 12, 28,  680000000, '2024-01-01'),
+('Donald Glover',       'American',   78, 72, 1.2,   4.8,   2.4,  0.4, 74, 5, 14,   920000000, '2024-01-01'),
+('Beyoncé',             'American',   94, 93, 318.0, 17.4,  22.6, 2.4, 96, 32, 88, 4200000000, '2024-01-01'),
+('James Earl Jones',    'American',   82, 78, 0,     0,     0.4,  0.0, 72, 2,  8,   980000000, '2024-01-01'),
+('John David Washington','American',  62, 58, 1.8,   0.6,   1.4,  0.1, 54, 0,  2,   480000000, '2024-01-01'),
+('Robert Pattinson',    'British',    76, 74, 0,     0,     5.8,  0.2, 78, 0,  4,   980000000, '2024-01-01'),
+('Elizabeth Debicki',   'Australian', 48, 44, 0.6,   0.2,   0.8,  0.0, 38, 0,  2,   180000000, '2024-01-01'),
+('Kenneth Branagh',     'British',    62, 58, 0.2,   0.4,   0.4,  0.1, 56, 1,  9,   480000000, '2024-01-01');
+
+-- ============================================================
+-- TABLE: film_cast
+-- ============================================================
+INSERT INTO film_cast (film_id, actor_id, role_type, billing_order) VALUES
+-- Avengers: Endgame
+(1, 1, 'lead', 1), (1, 2, 'lead', 2), (1, 3, 'lead', 3), (1, 4, 'supporting', 4), (1, 7, 'supporting', 5),
+-- Deadpool
+(2, 5, 'lead', 1), (2, 6, 'supporting', 2),
+-- Dunkirk
+(3, 8, 'lead', 1), (3, 9, 'supporting', 2), (3, 10, 'supporting', 3),
+-- Ford v Ferrari
+(4, 11, 'lead', 1), (4, 12, 'lead', 2),
+-- How to Train Your Dragon
+(5, 13, 'lead', 1), (5, 14, 'supporting', 2),
+-- Inside Out
+(6, 15, 'lead', 1), (6, 16, 'supporting', 2),
+-- Interstellar
+(7, 17, 'lead', 1), (7, 18, 'supporting', 2), (7, 19, 'supporting', 3),
+-- La La Land
+(8, 20, 'lead', 1), (8, 21, 'lead', 2), (8, 22, 'supporting', 3),
+-- The Lion King
+(9, 23, 'lead', 1), (9, 24, 'lead', 2), (9, 25, 'supporting', 3),
+-- Tenet
+(10, 26, 'lead', 1), (10, 27, 'lead', 2), (10, 28, 'supporting', 3), (10, 29, 'supporting', 4);
+
+-- ============================================================
+-- TABLE: theatrical_window_trends
+-- ============================================================
+INSERT INTO theatrical_window_trends (territory, territory_code, year, avg_theatrical_window_days, premium_vod_window_days, streaming_window_days, theatrical_revenue_share_pct, vod_revenue_share_pct, streaming_revenue_share_pct, avg_screens_per_film, yoy_admissions_change_pct) VALUES
+('United States',  'US', 2019,  90, 45, 180, 74.2, 14.8, 11.0, 4200, -0.8),
+('United States',  'US', 2020,  60, 30, 120, 42.6, 28.4, 29.0, 2800, -62.4),
+('United States',  'US', 2021,  72, 35, 135, 58.4, 22.6, 19.0, 3200, -41.2),
+('United States',  'US', 2022,  85, 42, 160, 68.8, 16.4, 14.8, 3800,  48.6),
+('United States',  'US', 2023,  90, 45, 180, 72.4, 14.8, 12.8, 4100,  18.4),
+('China',          'CN', 2019,  60, 90, 240, 82.6,  9.4,  8.0, 6800,   4.2),
+('China',          'CN', 2020,  45, 60, 180, 64.2, 18.8, 17.0, 4200, -68.6),
+('China',          'CN', 2022,  55, 80, 200, 78.4, 11.6, 10.0, 6200, -21.4),
+('China',          'CN', 2023,  60, 90, 240, 80.8, 10.2,  9.0, 7200,  32.8),
+('United Kingdom', 'GB', 2019,  90, 52, 180, 71.4, 16.2, 12.4, 1380, -1.2),
+('United Kingdom', 'GB', 2020,  56, 28, 120, 38.2, 30.4, 31.4, 820,  -71.8),
+('United Kingdom', 'GB', 2022,  85, 48, 168, 66.4, 18.8, 14.8, 1220,  42.6),
+('United Kingdom', 'GB', 2023,  88, 50, 175, 70.2, 16.4, 13.4, 1340,  12.8),
+('France',         'FR', 2019,  92, 56, 182, 73.8, 14.6, 11.6, 1040, -0.6),
+('France',         'FR', 2020,  58, 30, 125, 40.4, 28.6, 31.0, 680,  -68.2),
+('France',         'FR', 2022,  90, 52, 178, 69.6, 16.8, 13.6, 980,   38.4),
+('Germany',        'DE', 2019,  90, 50, 178, 72.4, 15.8, 11.8, 940,  -0.4),
+('Germany',        'DE', 2022,  85, 46, 168, 67.8, 17.6, 14.6, 880,   34.8),
+('Japan',          'JP', 2019, 120, 90, 270, 84.2,  9.2,  6.6, 780,   1.8),
+('Japan',          'JP', 2022, 115, 85, 260, 80.6, 11.2,  8.2, 740,  -12.4),
+('Japan',          'JP', 2023, 118, 88, 265, 82.4, 10.4,  7.2, 760,   8.6),
+('South Korea',    'KR', 2019,  90, 60, 180, 76.4, 13.6, 10.0, 2080,  2.4),
+('South Korea',    'KR', 2022,  85, 55, 175, 72.8, 15.2, 12.0, 1980,  28.6),
+('Australia',      'AU', 2019,  90, 50, 180, 71.8, 15.4, 12.8, 680,  -1.4),
+('Australia',      'AU', 2022,  85, 46, 168, 67.4, 17.8, 14.8, 640,   32.4),
+('Brazil',         'BR', 2019,  75, 42, 160, 69.4, 16.8, 13.8, 1280, -2.4),
+('Brazil',         'BR', 2022,  70, 38, 148, 64.8, 18.6, 16.6, 1180,  22.6),
+('India',          'IN', 2019,  56, 84, 210, 78.6, 12.4,  9.0, 4200,  4.8),
+('India',          'IN', 2022,  52, 78, 200, 75.2, 13.8, 11.0, 3980,  18.4),
+('Russia',         'RU', 2019,  80, 45, 165, 70.4, 16.8, 12.8, 720,  -0.8),
+('Russia',         'RU', 2022,  70, 38, 150, 58.4, 20.6, 21.0, 560,  -42.6),
+('Mexico',         'MX', 2019,  75, 42, 158, 68.4, 17.2, 14.4, 980,  -1.6),
+('Mexico',         'MX', 2022,  70, 38, 148, 64.6, 18.8, 16.6, 920,   26.4),
+('Latin America',  'LA', 2019,  72, 40, 155, 67.8, 17.6, 14.6, 4800, -1.2),
+('Latin America',  'LA', 2022,  68, 36, 142, 63.4, 19.2, 17.4, 4400,  24.8),
+('Italy',          'IT', 2019,  90, 54, 178, 72.6, 15.2, 12.2, 800,  -1.8),
+('Italy',          'IT', 2022,  85, 48, 168, 68.2, 17.2, 14.6, 740,   28.4),
+('Spain',          'ES', 2019,  90, 52, 178, 71.8, 15.8, 12.4, 860,  -1.2),
+('Spain',          'ES', 2022,  85, 46, 165, 67.4, 18.2, 14.4, 800,   26.8);
+
+-- ============================================================
+-- TABLE: currency_exchange_rates
+-- ============================================================
+INSERT INTO currency_exchange_rates (currency_code, currency_name, territory, usd_rate, eur_rate, rate_date, volatility_index) VALUES
+('CNY', 'Chinese Yuan',           'China',         7.2410,  7.8620, '2024-01-01', 3.2),
+('GBP', 'British Pound',          'United Kingdom', 0.7892,  0.8562, '2024-01-01', 6.8),
+('EUR', 'Euro',                   'Eurozone',       0.9214,  1.0000, '2024-01-01', 5.4),
+('JPY', 'Japanese Yen',           'Japan',         148.420, 161.020, '2024-01-01', 8.6),
+('KRW', 'South Korean Won',       'South Korea',  1326.800,1440.100, '2024-01-01', 5.2),
+('AUD', 'Australian Dollar',      'Australia',      1.5382,  1.6694, '2024-01-01', 7.4),
+('BRL', 'Brazilian Real',         'Brazil',         4.9740,  5.3980, '2024-01-01', 12.8),
+('MXN', 'Mexican Peso',           'Mexico',        17.1420, 18.6100, '2024-01-01', 9.4),
+('INR', 'Indian Rupee',           'India',         83.1200, 90.2400, '2024-01-01', 4.8),
+('RUB', 'Russian Ruble',          'Russia',        89.4200, 97.1600, '2024-01-01', 22.6),
+('CAD', 'Canadian Dollar',        'Canada',         1.3582,  1.4748, '2024-01-01', 5.8),
+('CHF', 'Swiss Franc',            'Switzerland',    0.8812,  0.9568, '2024-01-01', 4.2),
+('SEK', 'Swedish Krona',          'Sweden',        10.4820, 11.3840, '2024-01-01', 6.4),
+('NOK', 'Norwegian Krone',        'Norway',        10.5680, 11.4720, '2024-01-01', 7.2),
+('ARS', 'Argentine Peso',         'Argentina',    827.420,  898.100, '2024-01-01', 42.8),
+('CLP', 'Chilean Peso',           'Chile',        877.400,  952.800, '2024-01-01', 14.2),
+('COP', 'Colombian Peso',         'Colombia',    3908.200, 4242.600, '2024-01-01', 11.8),
+('IDR', 'Indonesian Rupiah',      'Indonesia',  15742.000,17102.000, '2024-01-01', 6.4),
+('MYR', 'Malaysian Ringgit',      'Malaysia',       4.7280,  5.1340, '2024-01-01', 5.6),
+('THB', 'Thai Baht',              'Thailand',      35.4800, 38.5200, '2024-01-01', 4.8),
+('SGD', 'Singapore Dollar',       'Singapore',      1.3486,  1.4648, '2024-01-01', 3.8),
+('HKD', 'Hong Kong Dollar',       'Hong Kong',      7.8210,  8.4940, '2024-01-01', 2.4),
+('TWD', 'Taiwan Dollar',          'Taiwan',        31.7400, 34.4800, '2024-01-01', 3.6),
+('SAR', 'Saudi Riyal',            'Saudi Arabia',   3.7512,  4.0740, '2024-01-01', 2.2),
+('AED', 'UAE Dirham',             'UAE',            3.6730,  3.9884, '2024-01-01', 1.8),
+('ZAR', 'South African Rand',     'South Africa',  18.6400, 20.2400, '2024-01-01', 14.6),
+('NGN', 'Nigerian Naira',         'Nigeria',      1468.000, 1594.000,'2024-01-01', 28.4),
+('EGP', 'Egyptian Pound',         'Egypt',         47.8200, 51.9200, '2024-01-01', 18.6),
+('TRY', 'Turkish Lira',           'Turkey',        30.4800, 33.1000, '2024-01-01', 32.4),
+('PLN', 'Polish Zloty',           'Poland',         3.9860,  4.3280, '2024-01-01', 7.8);
+
+-- ============================================================
+-- TABLE: vod_licensing_benchmarks
+-- ============================================================
+INSERT INTO vod_licensing_benchmarks (film_id, platform, territory, license_fee_usd, deal_type, license_term_months, revenue_share_pct, streams_projected, avg_revenue_per_stream_usd, deal_date) VALUES
+-- Avengers: Endgame
+(1, 'Disney+',       'United States',  85000000, 'exclusive',     36, 0.00,  48000000, 0.0042, '2019-11-01'),
+(1, 'Disney+',       'United Kingdom', 18000000, 'exclusive',     36, 0.00,   9200000, 0.0052, '2019-11-01'),
+(1, 'Disney+',       'Germany',         9200000, 'exclusive',     36, 0.00,   4800000, 0.0048, '2019-11-01'),
+(1, 'Disney+',       'France',          9800000, 'exclusive',     36, 0.00,   5200000, 0.0048, '2019-11-01'),
+(1, 'Disney+',       'Australia',       5200000, 'exclusive',     36, 0.00,   2800000, 0.0050, '2019-11-01'),
+(1, 'Disney+ Hotstar','India',         14000000, 'exclusive',     36, 0.00,  28000000, 0.0012, '2019-11-01'),
+-- Deadpool
+(2, 'Netflix',       'United States',  12000000, 'non-exclusive', 24, 0.00,  14000000, 0.0038, '2017-06-01'),
+(2, 'Netflix',       'United Kingdom',  3800000, 'non-exclusive', 24, 0.00,   4200000, 0.0042, '2017-06-01'),
+(2, 'HBO Max',       'United States',  18000000, 'exclusive',     18, 0.00,  18000000, 0.0044, '2018-06-01'),
+(2, 'Star+',         'Latin America',   4200000, 'exclusive',     24, 0.00,   8400000, 0.0018, '2017-09-01'),
+-- Dunkirk
+(3, 'Netflix',       'United States',   9800000, 'exclusive',     18, 0.00,  11000000, 0.0042, '2018-04-01'),
+(3, 'Netflix',       'United Kingdom',  3200000, 'exclusive',     18, 0.00,   3800000, 0.0042, '2018-04-01'),
+(3, 'Prime Video',   'Germany',         2800000, 'exclusive',     18, 0.00,   3200000, 0.0042, '2018-04-01'),
+(3, 'Prime Video',   'France',          3100000, 'exclusive',     18, 0.00,   3500000, 0.0042, '2018-04-01'),
+-- Ford v Ferrari
+(4, 'Disney+',       'United States',  11000000, 'exclusive',     24, 0.00,  12000000, 0.0044, '2020-05-01'),
+(4, 'Disney+',       'United Kingdom',  3600000, 'exclusive',     24, 0.00,   3800000, 0.0048, '2020-05-01'),
+-- How to Train Your Dragon
+(5, 'Netflix',       'United States',   8400000, 'non-exclusive', 24, 0.00,   9800000, 0.0036, '2012-01-01'),
+(5, 'Netflix',       'United Kingdom',  2800000, 'non-exclusive', 24, 0.00,   3200000, 0.0040, '2012-01-01'),
+-- Inside Out
+(6, 'Disney+',       'United States',  22000000, 'exclusive',     36, 0.00,  24000000, 0.0042, '2020-01-01'),
+(6, 'Disney+',       'United Kingdom',  6800000, 'exclusive',     36, 0.00,   7200000, 0.0048, '2020-01-01'),
+(6, 'Disney+ Hotstar','India',          4800000, 'exclusive',     36, 0.00,  12000000, 0.0014, '2020-01-01'),
+-- Interstellar
+(7, 'Netflix',       'United States',  14000000, 'exclusive',     18, 0.00,  16000000, 0.0044, '2015-12-01'),
+(7, 'Netflix',       'China',           9200000, 'exclusive',     18, 0.00,  22000000, 0.0016, '2015-12-01'),
+(7, 'Prime Video',   'Germany',         3600000, 'exclusive',     18, 0.00,   4200000, 0.0042, '2015-12-01'),
+-- La La Land
+(8, 'Netflix',       'United States',   6800000, 'exclusive',     24, 0.00,   7800000, 0.0042, '2017-04-01'),
+(8, 'Netflix',       'France',          2400000, 'exclusive',     24, 0.00,   2800000, 0.0044, '2017-04-01'),
+(8, 'Netflix',       'South Korea',     2200000, 'exclusive',     24, 0.00,   2600000, 0.0044, '2017-04-01'),
+-- The Lion King
+(9, 'Disney+',       'United States',  65000000, 'exclusive',     36, 0.00,  38000000, 0.0048, '2020-01-01'),
+(9, 'Disney+',       'United Kingdom', 14000000, 'exclusive',     36, 0.00,   8200000, 0.0052, '2020-01-01'),
+(9, 'Disney+ Hotstar','India',         18000000, 'exclusive',     36, 0.00,  36000000, 0.0014, '2020-01-01'),
+-- Tenet
+(10,'HBO Max',       'United States',  20000000, 'exclusive',     18, 0.00,  16000000, 0.0052, '2021-02-01'),
+(10,'Prime Video',   'United Kingdom',  5400000, 'exclusive',     18, 0.00,   3600000, 0.0052, '2021-02-01'),
+(10,'Netflix',       'Germany',         4200000, 'exclusive',     18, 0.00,   2800000, 0.0048, '2021-02-01');
+
+-- ============================================================
+-- TABLE: festival_performance
+-- ============================================================
+INSERT INTO festival_performance (film_id, festival_name, festival_year, award_category, award_result, audience_score, critic_score, buzz_score) VALUES
+(1, 'None (Wide Release)',     2019, 'N/A',                    'screened',         8.4, 8.4, 96),
+(2, 'Berlin International',   2016, 'Special Screening',      'screened',         8.1, 7.9, 84),
+(3, 'Telluride Film Festival', 2017, 'Best Director',          'nominated',        8.8, 9.2, 92),
+(3, 'Toronto Int. FF',        2017, 'Audience Award',         'nominated',        8.6, 9.0, 88),
+(3, 'Academy Awards',         2018, 'Best Picture',           'nominated',        8.8, 9.1, 94),
+(3, 'Academy Awards',         2018, 'Best Director',          'nominated',        8.8, 9.1, 94),
+(4, 'Academy Awards',         2020, 'Best Picture',           'nominated',        8.2, 8.0, 78),
+(4, 'Academy Awards',         2020, 'Best Film Editing',      'won',              8.2, 8.0, 82),
+(5, 'Annie Awards',           2011, 'Best Animated Feature',  'won',              8.1, 7.8, 72),
+(6, 'Cannes Film Festival',   2015, 'Special Screening',      'screened',         8.6, 8.8, 90),
+(6, 'Academy Awards',         2016, 'Best Animated Feature',  'won',              8.6, 8.8, 92),
+(7, 'Interstellar Premiere',  2014, 'IMAX Special Screening', 'screened',         8.4, 8.6, 88),
+(7, 'Academy Awards',         2015, 'Best Visual Effects',    'won',              8.4, 8.6, 86),
+(8, 'Venice Film Festival',   2016, 'Golden Lion',            'won',              9.0, 8.8, 96),
+(8, 'Toronto Int. FF',        2016, 'Audience Award',         'won',              9.0, 8.9, 94),
+(8, 'Academy Awards',         2017, 'Best Picture',           'nominated',        8.8, 8.6, 98),
+(8, 'Academy Awards',         2017, 'Best Director',          'won',              8.8, 8.6, 98),
+(8, 'Academy Awards',         2017, 'Best Actress',           'won',              8.8, 8.6, 96),
+(9, 'None (Wide Release)',    2019, 'N/A',                    'screened',         7.8, 7.1, 80),
+(10,'Toronto Int. FF',        2020, 'Special Screening',      'screened',         7.6, 7.4, 72),
+(10,'Academy Awards',         2021, 'Best Cinematography',    'nominated',        7.6, 7.4, 74);
+
+-- ============================================================
+-- TABLE: genre_territory_benchmarks
+-- ============================================================
+INSERT INTO genre_territory_benchmarks (genre, territory, territory_code, avg_opening_weekend_usd, avg_total_gross_usd, avg_multiplier, sample_size, year_range_start, year_range_end) VALUES
+-- Action/Superhero
+('Action',    'United States',  'US', 78000000,  280000000, 3.6, 48, 2010, 2023),
+('Action',    'China',          'CN', 62000000,  184000000, 3.0, 42, 2012, 2023),
+('Action',    'United Kingdom', 'GB', 18000000,   62000000, 3.4, 48, 2010, 2023),
+('Action',    'Germany',        'DE', 12000000,   40000000, 3.3, 48, 2010, 2023),
+('Action',    'France',         'FR', 14000000,   46000000, 3.3, 48, 2010, 2023),
+('Action',    'Japan',          'JP', 11000000,   42000000, 3.8, 42, 2012, 2023),
+('Action',    'South Korea',    'KR', 18000000,   58000000, 3.2, 44, 2011, 2023),
+('Action',    'Australia',      'AU', 7800000,    26000000, 3.3, 48, 2010, 2023),
+('Action',    'Brazil',         'BR', 9200000,    30000000, 3.3, 44, 2011, 2023),
+('Action',    'India',          'IN', 14000000,   48000000, 3.4, 42, 2012, 2023),
+('Action',    'Latin America',  'LA', 28000000,   92000000, 3.3, 44, 2011, 2023),
+-- Animation/Family
+('Animation', 'United States',  'US', 52000000,  210000000, 4.0, 38, 2010, 2023),
+('Animation', 'China',          'CN', 32000000,   96000000, 3.0, 32, 2013, 2023),
+('Animation', 'United Kingdom', 'GB', 12000000,   50000000, 4.2, 38, 2010, 2023),
+('Animation', 'Germany',        'DE', 10000000,   42000000, 4.2, 38, 2010, 2023),
+('Animation', 'France',         'FR', 11000000,   46000000, 4.2, 38, 2010, 2023),
+('Animation', 'Japan',          'JP', 9200000,    38000000, 4.1, 34, 2012, 2023),
+('Animation', 'South Korea',    'KR', 8800000,    36000000, 4.1, 36, 2011, 2023),
+('Animation', 'Australia',      'AU', 5800000,    24000000, 4.1, 38, 2010, 2023),
+('Animation', 'India',          'IN', 8400000,    28000000, 3.3, 32, 2013, 2023),
+('Animation', 'Latin America',  'LA', 18000000,   72000000, 4.0, 36, 2011, 2023),
+-- Drama
+('Drama',     'United States',  'US', 14000000,   78000000, 5.6, 54, 2010, 2023),
+('Drama',     'United Kingdom', 'GB', 6400000,    32000000, 5.0, 54, 2010, 2023),
+('Drama',     'France',         'FR', 7200000,    36000000, 5.0, 54, 2010, 2023),
+('Drama',     'Germany',        'DE', 5200000,    26000000, 5.0, 54, 2010, 2023),
+('Drama',     'Japan',          'JP', 4800000,    22000000, 4.6, 48, 2012, 2023),
+('Drama',     'South Korea',    'KR', 5200000,    24000000, 4.6, 48, 2011, 2023),
+('Drama',     'Australia',      'AU', 2800000,    12000000, 4.3, 54, 2010, 2023),
+-- Sci-Fi
+('Sci-Fi',    'United States',  'US', 42000000,  162000000, 3.9, 32, 2010, 2023),
+('Sci-Fi',    'China',          'CN', 38000000,  108000000, 2.8, 28, 2013, 2023),
+('Sci-Fi',    'United Kingdom', 'GB', 11000000,   44000000, 4.0, 32, 2010, 2023),
+('Sci-Fi',    'Germany',        'DE', 9200000,    36000000, 3.9, 32, 2010, 2023),
+('Sci-Fi',    'France',         'FR', 10000000,   40000000, 4.0, 32, 2010, 2023),
+('Sci-Fi',    'Japan',          'JP', 8400000,    34000000, 4.0, 28, 2012, 2023),
+('Sci-Fi',    'South Korea',    'KR', 9600000,    38000000, 4.0, 30, 2011, 2023),
+('Sci-Fi',    'Australia',      'AU', 4400000,    18000000, 4.1, 32, 2010, 2023),
+-- Musical/Romance
+('Drama',     'France',         'FR', 9800000,    48000000, 4.9, 28, 2012, 2023), -- higher for musical
+('Drama',     'South Korea',    'KR', 7400000,    36000000, 4.9, 26, 2013, 2023);
+
+-- ============================================================
+-- TABLE: marketing_performance
+-- ============================================================
+INSERT INTO marketing_performance (film_id, territory, p_and_a_spend_usd, digital_spend_usd, tv_spend_usd, outdoor_spend_usd, social_spend_usd, revenue_generated_usd, roi_pct, campaign_type) VALUES
+(1,  'United States',  120000000, 38000000, 52000000, 18000000, 12000000, 858373000,  515.3, 'franchise-event'),
+(1,  'China',           42000000, 18000000, 14000000,  6000000,  4000000, 629220000, 1398.1, 'franchise-event'),
+(1,  'United Kingdom',  28000000, 10000000, 12000000,  4000000,  2000000, 114080000,  307.4, 'franchise-event'),
+(2,  'United States',   58000000, 22000000, 24000000,  8000000,  4000000, 363070709,  525.6, 'viral-social'),
+(2,  'United Kingdom',  14000000,  6000000,  6000000,  1500000,  500000,   83400000,  495.7, 'viral-social'),
+(3,  'United States',   52000000, 16000000, 24000000,  8000000,  4000000, 190317488,  265.9, 'prestige-awards'),
+(3,  'United Kingdom',  14000000,  4800000,  6400000,  2200000,  600000,   56900000,  306.4, 'prestige-awards'),
+(3,  'France',          10000000,  3400000,  4400000,  1800000,  400000,   41800000,  318.0, 'prestige-awards'),
+(4,  'United States',   38000000, 12000000, 18000000,  6000000,  2000000, 117620073,  209.5, 'prestige-awards'),
+(5,  'United States',   48000000, 12000000, 24000000,  8000000,  4000000, 217581231,  353.3, 'family-holiday'),
+(6,  'United States',   54000000, 16000000, 26000000,  8000000,  4000000, 356461711,  560.1, 'family-summer'),
+(7,  'United States',   48000000, 14000000, 24000000,  7000000,  3000000, 188020017,  291.7, 'prestige-imax'),
+(7,  'China',           24000000, 10000000,  8000000,  4000000,  2000000, 129000000,  437.5, 'prestige-imax'),
+(8,  'United States',   32000000, 10000000, 14000000,  6000000,  2000000, 151101803,  372.2, 'awards-campaign'),
+(8,  'France',           6800000,  2200000,  2800000,  1400000,  400000,   38600000,  467.6, 'awards-campaign'),
+(9,  'United States',   90000000, 28000000, 40000000, 14000000,  8000000, 543638043,  504.0, 'franchise-family'),
+(9,  'China',           38000000, 16000000, 12000000,  6000000,  4000000, 119200000,  213.7, 'franchise-family'),
+(10, 'United States',   60000000, 18000000, 28000000,  9000000,  5000000,  58460174,  -2.6,  'covid-impacted'),
+(10, 'China',           28000000, 12000000,  9000000,  5000000,  2000000,  66800000,  138.6, 'covid-impacted'),
+(10, 'Russia',           8000000,  2800000,  3200000,  1400000,  600000,   26400000,  230.0, 'prestige-imax');
+
+-- ============================================================
+-- TABLE: censorship_risk_flags
+-- ============================================================
+INSERT INTO censorship_risk_flags (film_id, territory, territory_code, risk_level, content_type, description, required_cuts, rating_assigned, approved) VALUES
+-- Deadpool
+(2, 'China',         'CN', 'banned',  'violence, sexual content', 'R-rated content: graphic violence, sexual humor, and language do not meet NRTA standards. Film not approved for theatrical release.', TRUE,  'NR',    FALSE),
+(2, 'Malaysia',      'MY', 'banned',  'sexual content',           'Sexual humor and crude language violate FINAS content guidelines for theatrical exhibition.', TRUE,  'NR',    FALSE),
+(2, 'United Arab Emirates','AE','banned','sexual content, violence','MEDIACL rejected film citing excessive sexual content and graphic violence.', TRUE, 'NR',   FALSE),
+(2, 'Saudi Arabia',  'SA', 'banned',  'sexual content',           'Content deemed morally inappropriate under GCAM guidelines.', TRUE,  'NR',    FALSE),
+(2, 'Russia',        'RU', 'medium',  'violence',                 'Minor cuts required to achieve R-rated equivalent. Released with some edits.', TRUE,  '18+',   TRUE),
+(2, 'South Korea',   'KR', 'low',     'violence',                 'Rated 18+ by KMRB. No cuts required. Theatrical release approved.', FALSE, '18',    TRUE),
+-- Dunkirk
+(3, 'Germany',       'DE', 'low',     'war violence',             'Depiction of WWII warfare. Standard age restriction applied. No ideological concerns.', FALSE, '12',    TRUE),
+(3, 'France',        'FR', 'low',     'historical sensitivity',   'Film portrays French military at Dunkirk. Some minor cultural sensitivity review required. No cuts.', FALSE,'PG-13',TRUE),
+(3, 'China',         'CN', 'medium',  'foreign military content',  'NRTA review required extended evaluation. Approved with no cuts after 6-week delay.', FALSE, 'PG',    TRUE),
+-- Interstellar
+(7, 'China',         'CN', 'low',     'scientific content',       'No content issues. Approved for release. Strong STEM themes positively received.', FALSE, 'PG',    TRUE),
+(7, 'Saudi Arabia',  'SA', 'medium',  'religious themes',         'Minor concerns about scientific themes conflicting with religious views on creation. Released without cuts after review.', FALSE, 'G', TRUE),
+-- La La Land
+(8, 'China',         'CN', 'low',     'none',                     'No content concerns. Approved with standard PG rating equivalent.', FALSE, 'PG',    TRUE),
+(8, 'Saudi Arabia',  'SA', 'low',     'none',                     'Approved. No content concerns under GCAM guidelines.', FALSE, 'G',     TRUE),
+-- Tenet
+(10,'China',         'CN', 'low',     'none',                     'No content issues. Fast-tracked for release as part of COVID-19 reopening strategy.',FALSE,'PG',TRUE),
+-- Avengers: Endgame
+(1, 'Russia',        'RU', 'medium',  'LGBTQ+ content',           'Brief scene with gay character flagged under Russian propaganda laws. Scene edited for Russian release.', TRUE, '12+',   TRUE),
+(1, 'China',         'CN', 'low',     'none',                     'Approved with minor dialogue adjustments. No significant content flags.', FALSE, 'PG',    TRUE),
+-- Inside Out
+(6, 'China',         'CN', 'low',     'none',                     'Positive reception; emotional themes align well with cultural values. Approved.', FALSE, 'G',     TRUE),
+-- The Lion King
+(9, 'China',         'CN', 'low',     'none',                     'No content issues. Disney relationship ensures expedited approval.', FALSE, 'G',     TRUE),
+-- How to Train Your Dragon
+(5, 'China',         'CN', 'low',     'none',                     'Approved. Family animation with no content concerns.', FALSE, 'G',     TRUE),
+-- Ford v Ferrari
+(4, 'India',         'IN', 'low',     'none',                     'No content concerns. U/A certificate recommended.', FALSE, 'U/A',   TRUE);
+
+-- ============================================================
+-- TABLE: acquisition_deals
+-- ============================================================
+INSERT INTO acquisition_deals (film_id, territory, deal_type, minimum_guarantee_usd, advance_usd, recoupment_threshold_usd, backend_pct, acquirer, deal_date, outcome, actual_revenue_usd) VALUES
+-- Avengers: Endgame
+(1,  'United States',  'all-rights',  0,          0,          0,          0.0,  'Walt Disney Pictures',   '2018-06-01', 'profitable',  942000000),
+(1,  'China',          'theatrical',  45000000,   60000000,   180000000,  15.0, 'Disney China',           '2018-08-01', 'profitable',  629220000),
+(1,  'United Kingdom', 'all-rights',  22000000,   28000000,    80000000,  12.0, 'Walt Disney Studios UK', '2018-06-15', 'profitable',  148000000),
+-- Deadpool
+(2,  'United States',  'all-rights',  0,          0,          0,          0.0,  '20th Century Fox',       '2015-04-01', 'profitable',  420000000),
+(2,  'United Kingdom', 'theatrical',   8000000,   10000000,   32000000,   12.0, 'Fox UK',                 '2015-05-01', 'profitable',   97000000),
+(2,  'Latin America',  'all-rights',   6000000,    8000000,   26000000,   14.0, 'Fox Latin America',      '2015-05-01', 'profitable',   48000000),
+-- Dunkirk
+(3,  'United States',  'all-rights',   0,          0,          0,          0.0, 'Warner Bros.',           '2016-09-01', 'profitable',  218000000),
+(3,  'France',         'theatrical',   6000000,    8000000,   24000000,   12.0, 'Warner Bros. France',    '2016-09-15', 'profitable',   48000000),
+(3,  'United Kingdom', 'theatrical',   8000000,   10000000,   32000000,   12.0, 'Warner Bros. UK',        '2016-09-15', 'profitable',   64000000),
+-- Ford v Ferrari
+(4,  'United States',  'all-rights',   0,          0,          0,          0.0, '20th Century Fox',       '2018-11-01', 'profitable',  128000000),
+(4,  'Germany',        'theatrical',   4000000,    5000000,   18000000,   12.0, 'Fox Germany',            '2018-12-01', 'profitable',   30000000),
+-- Inside Out
+(6,  'United States',  'all-rights',   0,          0,          0,          0.0, 'Walt Disney Pictures',   '2014-06-01', 'profitable',  400000000),
+(6,  'Japan',          'all-rights',   6000000,    8000000,   22000000,   12.0, 'Disney Japan',           '2014-08-01', 'profitable',   34000000),
+-- Interstellar
+(7,  'United States',  'all-rights',   0,          0,          0,          0.0, 'Paramount Pictures',     '2013-10-01', 'profitable',  220000000),
+(7,  'China',          'theatrical',  18000000,   24000000,   60000000,   15.0, 'Paramount China',        '2013-11-01', 'profitable',  129000000),
+(7,  'South Korea',    'theatrical',   4800000,    6200000,   18000000,   12.0, 'Paramount Korea',        '2013-11-01', 'profitable',   42000000),
+-- La La Land
+(8,  'United States',  'all-rights',   0,          0,          0,          0.0, 'Lionsgate',              '2016-08-01', 'profitable',  171000000),
+(8,  'France',         'theatrical',   3200000,    4200000,   14000000,   14.0, 'Lionsgate France',       '2016-09-01', 'profitable',   42000000),
+(8,  'South Korea',    'theatrical',   2800000,    3600000,   12000000,   14.0, 'Lionsgate Korea',        '2016-09-01', 'profitable',   32000000),
+(8,  'Japan',          'theatrical',   2600000,    3400000,   10000000,   14.0, 'Lionsgate Japan',        '2016-09-01', 'profitable',   24000000),
+-- The Lion King
+(9,  'United States',  'all-rights',   0,          0,          0,          0.0, 'Walt Disney Pictures',   '2018-04-01', 'profitable',  620000000),
+(9,  'China',          'theatrical',  28000000,   36000000,   88000000,   15.0, 'Disney China',           '2018-05-01', 'profitable',  119200000),
+(9,  'India',          'theatrical',   9000000,   12000000,   36000000,   14.0, 'Disney India',           '2018-05-01', 'profitable',   62000000),
+-- Tenet
+(10, 'United States',  'all-rights',   0,          0,          0,          0.0, 'Warner Bros.',           '2019-06-01', 'breakeven',    82000000),
+(10, 'China',          'theatrical',  14000000,   18000000,   48000000,   15.0, 'Warner Bros. China',     '2019-07-01', 'profitable',   66800000),
+(10, 'Russia',         'theatrical',   3400000,    4400000,   14000000,   12.0, 'Warner Bros. Russia',    '2019-07-01', 'profitable',   28000000);
+
+-- ============================================================
+-- ADDITIONAL REFERENCE TABLES
+-- ============================================================
+
+-- Streaming platform market share by territory
+CREATE TABLE IF NOT EXISTS streaming_platform_market_share (
+    id              SERIAL PRIMARY KEY,
+    platform        VARCHAR(100),
+    territory       VARCHAR(100),
+    territory_code  CHAR(2),
+    year            INTEGER,
+    subscribers_m   NUMERIC(8,2),
+    market_share_pct NUMERIC(5,2),
+    avg_monthly_revenue_usd NUMERIC(8,2),
+    content_budget_usd BIGINT,
+    film_licensing_budget_usd BIGINT
+);
+
+INSERT INTO streaming_platform_market_share (platform, territory, territory_code, year, subscribers_m, market_share_pct, avg_monthly_revenue_usd, content_budget_usd, film_licensing_budget_usd) VALUES
+('Netflix',     'United States',  'US', 2023,  75.6, 32.4, 15.49, 17000000000, 2800000000),
+('Disney+',     'United States',  'US', 2023,  46.2, 19.8, 13.99, 9000000000,  1800000000),
+('Prime Video', 'United States',  'US', 2023,  62.4, 26.8, 8.99,  7000000000,  1400000000),
+('HBO Max',     'United States',  'US', 2023,  48.6, 20.8, 15.99, 6000000000,  1200000000),
+('Netflix',     'United Kingdom', 'GB', 2023,  12.8, 38.2, 10.99, 1200000000,  240000000),
+('Disney+',     'United Kingdom', 'GB', 2023,   6.4, 19.1, 8.99,  480000000,   96000000),
+('Prime Video', 'United Kingdom', 'GB', 2023,   9.6, 28.7, 8.99,  720000000,   144000000),
+('Netflix',     'Germany',        'DE', 2023,  10.2, 42.6, 12.99, 800000000,   160000000),
+('Prime Video', 'Germany',        'DE', 2023,   7.8, 32.6, 8.99,  600000000,   120000000),
+('Netflix',     'France',         'FR', 2023,  10.8, 44.2, 13.49, 900000000,   180000000),
+('Netflix',     'Japan',          'JP', 2023,   8.4, 28.4, 13.99, 700000000,   140000000),
+('Netflix',     'South Korea',    'KR', 2023,   5.6, 32.4, 12.99, 500000000,   100000000),
+('Netflix',     'Brazil',         'BR', 2023,  16.4, 48.6, 18.90, 600000000,   120000000),
+('Netflix',     'India',          'IN', 2023,  11.2, 18.4, 199.00,400000000,   80000000),  -- INR price
+('Disney+ Hotstar','India',       'IN', 2023,  38.4, 63.2, 299.00, 800000000,  160000000),
+('iQIYI',       'China',          'CN', 2023, 108.6, 28.4, 25.00, 3200000000,  480000000),
+('Youku',       'China',          'CN', 2023,  96.4, 25.2, 20.00, 2800000000,  420000000),
+('Tencent Video','China',         'CN', 2023, 124.2, 32.4, 25.00, 3600000000,  540000000);
+
+-- Territory risk index for acquisition planning
+CREATE TABLE IF NOT EXISTS territory_risk_index (
+    id              SERIAL PRIMARY KEY,
+    territory       VARCHAR(100),
+    territory_code  CHAR(2),
+    political_risk  NUMERIC(4,1),   -- 0-10 (10=highest risk)
+    currency_risk   NUMERIC(4,1),
+    censorship_risk NUMERIC(4,1),
+    piracy_risk     NUMERIC(4,1),
+    collection_risk NUMERIC(4,1),   -- difficulty collecting revenues
+    overall_risk    NUMERIC(4,1),
+    market_attractiveness NUMERIC(4,1), -- 0-10 (10=most attractive)
+    year            INTEGER,
+    notes           TEXT
+);
+
+INSERT INTO territory_risk_index (territory, territory_code, political_risk, currency_risk, censorship_risk, piracy_risk, collection_risk, overall_risk, market_attractiveness, year, notes) VALUES
+('United States',  'US', 1.2, 1.4, 1.0, 2.8, 1.2, 1.5, 9.8, 2023, 'Gold standard market. Highly liquid, transparent, low risk.'),
+('China',          'CN', 6.8, 3.2, 8.4, 5.6, 6.8, 6.2, 8.6, 2023, 'High censorship and political risk. Enormous upside when approved. NRTA quota limits foreign films.'),
+('United Kingdom', 'GB', 2.4, 3.8, 1.2, 2.4, 1.4, 2.2, 8.8, 2023, 'Stable, English-language market. Strong theatrical culture.'),
+('Germany',        'DE', 2.2, 2.6, 2.8, 2.2, 1.6, 2.3, 8.2, 2023, 'Strong arthouse and mainstream market. High dub preference.'),
+('France',         'FR', 2.6, 2.6, 2.4, 2.6, 2.0, 2.4, 8.0, 2023, 'Strong film culture. Quota restrictions on non-EU content. Strong theatrical preference.'),
+('Japan',          'JP', 2.4, 4.8, 2.2, 3.2, 2.4, 3.0, 8.4, 2023, 'Long theatrical windows. High per-ticket revenue. Strong franchise loyalty.'),
+('South Korea',    'KR', 3.8, 3.6, 3.4, 2.8, 2.6, 3.2, 8.0, 2023, 'Sophisticated market. Screen quota for domestic films. High mobile consumption.'),
+('Australia',      'AU', 1.8, 3.8, 1.2, 2.4, 1.6, 2.2, 7.8, 2023, 'Stable Anglophone market. Follows US trends closely.'),
+('Brazil',         'BR', 4.8, 8.6, 3.2, 6.4, 4.8, 5.6, 7.0, 2023, 'Large market but high currency volatility. Collection challenges. Growing streaming.'),
+('Mexico',         'MX', 4.2, 6.4, 2.8, 5.8, 4.2, 4.7, 6.8, 2023, 'Large Spanish-language market. Strong theatrical attendance. Currency risk moderate.'),
+('India',          'IN', 3.6, 4.2, 4.8, 7.8, 3.8, 4.8, 7.4, 2023, 'Massive market. Extremely price-sensitive. High piracy. Bollywood competition strong.'),
+('Russia',         'RU', 9.2, 8.8, 4.8, 5.4, 7.4, 7.1, 3.2, 2023, 'Sanctions environment. Major Hollywood studios have withdrawn. Very high political risk.'),
+('Latin America',  'LA', 4.6, 7.4, 3.0, 6.0, 4.4, 5.1, 6.8, 2023, 'Aggregate region. Growing theatrical base. Currency basket risk.'),
+('Italy',          'IT', 3.2, 2.6, 1.8, 3.6, 2.8, 2.8, 7.4, 2023, 'Mid-tier EU market. Preference for dubbed content.'),
+('Spain',          'ES', 3.0, 2.6, 1.6, 3.8, 2.6, 2.7, 7.6, 2023, 'Growing market. Bilingual dubbing required. Strong streaming adoption.'),
+('United Arab Emirates','AE',3.8,1.8,6.8, 2.4, 2.4, 3.4, 6.8, 2023,'High censorship for adult content. Wealthy market. Short theatrical window.'),
+('Saudi Arabia',   'SA', 4.8, 2.2, 7.8, 2.8, 3.2, 4.2, 6.2, 2023, 'Recently opened cinema market. Growing fast. High censorship risk for adult content.'),
+('Turkey',         'TR', 5.6, 9.4, 4.8, 5.2, 4.8, 6.0, 5.8, 2023, 'High currency devaluation risk. Politically unstable. Mid-size market.'),
+('Nigeria',        'NG', 6.2, 9.8, 4.2, 8.4, 7.2, 7.2, 4.8, 2023, 'Emerging market. Nascent multiplex infrastructure. High currency/collection risk.'),
+('South Africa',   'ZA', 4.2, 7.2, 2.4, 5.6, 3.8, 4.6, 6.0, 2023, 'Gateway to Sub-Saharan Africa. Growing multiplex market. Currency volatility.');
+
+-- Historical MG benchmarks by genre and territory size
+CREATE TABLE IF NOT EXISTS mg_benchmarks (
+    id              SERIAL PRIMARY KEY,
+    genre           VARCHAR(100),
+    territory_tier  VARCHAR(20),    -- tier1, tier2, tier3
+    territory       VARCHAR(100),
+    budget_range    VARCHAR(50),    -- micro(<5M), low(5-30M), mid(30-100M), high(>100M)
+    min_mg_usd      BIGINT,
+    max_mg_usd      BIGINT,
+    typical_mg_usd  BIGINT,
+    notes           TEXT,
+    year_updated    INTEGER
+);
+
+INSERT INTO mg_benchmarks (genre, territory_tier, territory, budget_range, min_mg_usd, max_mg_usd, typical_mg_usd, notes, year_updated) VALUES
+-- Tier 1 High Budget Action
+('Action', 'tier1', 'United States',  'high',  80000000, 200000000, 140000000, 'Studio tentpole. MG rarely applicable — studio retains.', 2023),
+('Action', 'tier1', 'China',          'high',  30000000,  80000000,  52000000, 'NRTA quota. 25% revenue share to Chinese side.', 2023),
+('Action', 'tier1', 'United Kingdom', 'high',  12000000,  32000000,  22000000, 'Strong franchise performance expected.', 2023),
+('Action', 'tier1', 'Germany',        'high',   6000000,  18000000,  12000000, 'Dub costs ~$1.5M additional.', 2023),
+('Action', 'tier1', 'France',         'high',   7000000,  20000000,  13000000, 'Theatrical culture supports strong MG.', 2023),
+('Action', 'tier1', 'Japan',          'high',   8000000,  22000000,  15000000, 'Long theatrical window multiplies returns.', 2023),
+('Action', 'tier1', 'South Korea',    'high',   9000000,  24000000,  16000000, 'Superhero franchise overperforms here.', 2023),
+('Action', 'tier1', 'Australia',      'high',   4000000,  12000000,   8000000, 'Follows US trends.', 2023),
+('Action', 'tier1', 'Latin America',  'high',  12000000,  36000000,  24000000, 'Aggregate region MG.', 2023),
+-- Mid Budget Drama
+('Drama',  'tier1', 'United States',  'mid',    3000000,  14000000,   7000000, 'Dependent on awards momentum and cast.', 2023),
+('Drama',  'tier1', 'United Kingdom', 'mid',    1200000,   5200000,   3000000, 'British themes/cast command premium.', 2023),
+('Drama',  'tier1', 'France',         'mid',    1500000,   6200000,   3500000, 'French market strongly favors prestige drama.', 2023),
+('Drama',  'tier1', 'Germany',        'mid',    1000000,   4200000,   2400000, 'Awards films perform well in arthouse circuit.', 2023),
+('Drama',  'tier1', 'South Korea',    'mid',    1000000,   4000000,   2200000, 'Film buff demographic supports quality drama.', 2023),
+('Drama',  'tier1', 'Japan',          'mid',    1200000,   4800000,   2600000, 'Premium pricing helps smaller films.', 2023),
+('Drama',  'tier2', 'Australia',      'mid',     600000,   2400000,   1400000, '', 2023),
+-- Animation Family
+('Animation','tier1','United States', 'high',  20000000,  80000000,  48000000, 'Broad demographic appeal.', 2023),
+('Animation','tier1','China',         'high',  10000000,  36000000,  22000000, 'NRTA approval required.', 2023),
+('Animation','tier1','United Kingdom','high',   5000000,  18000000,  11000000, '', 2023),
+('Animation','tier1','France',        'high',   5500000,  19000000,  12000000, '', 2023),
+('Animation','tier1','Germany',       'high',   5000000,  17000000,  11000000, '', 2023),
+('Animation','tier1','Japan',         'high',   6000000,  20000000,  13000000, 'Animation culture strong.', 2023),
+('Animation','tier1','South Korea',   'high',   5500000,  18000000,  12000000, '', 2023),
+('Animation','tier1','Latin America', 'high',   6000000,  22000000,  14000000, '', 2023),
+-- Sci-Fi Mid/High
+('Sci-Fi', 'tier1', 'United States',  'high',  16000000,  52000000,  34000000, 'Nolan brand commands premium.', 2023),
+('Sci-Fi', 'tier1', 'China',          'high',  12000000,  38000000,  26000000, 'Chinese market embraces hard SF.', 2023),
+('Sci-Fi', 'tier1', 'United Kingdom', 'high',   5000000,  16000000,  10000000, '', 2023),
+('Sci-Fi', 'tier1', 'Germany',        'high',   4000000,  13000000,   8000000, '', 2023),
+('Sci-Fi', 'tier1', 'South Korea',    'high',   4500000,  14000000,   9000000, '', 2023),
+('Sci-Fi', 'tier1', 'Japan',          'high',   4800000,  15000000,  10000000, '', 2023),
+-- Musical Romance
+('Drama',  'tier1', 'United States',  'low',    1000000,   6000000,   3200000, 'Awards buzz dramatically increases MG.', 2023),
+('Drama',  'tier1', 'France',         'low',    1200000,   6800000,   3800000, 'Musical/romance overperforms in France.', 2023),
+('Drama',  'tier1', 'South Korea',    'low',    1000000,   5600000,   3200000, 'La La Land type overperformed significantly.', 2023),
+('Drama',  'tier1', 'Japan',          'low',    1100000,   5800000,   3400000, '', 2023);
+
+-- ============================================================
+-- INDEXES for query performance
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_box_office_film    ON box_office_performance(film_id);
+CREATE INDEX IF NOT EXISTS idx_box_office_terr    ON box_office_performance(territory);
+CREATE INDEX IF NOT EXISTS idx_box_office_genre   ON box_office_performance(film_id, territory);
+CREATE INDEX IF NOT EXISTS idx_vod_film           ON vod_licensing_benchmarks(film_id);
+CREATE INDEX IF NOT EXISTS idx_vod_platform       ON vod_licensing_benchmarks(platform, territory);
+CREATE INDEX IF NOT EXISTS idx_window_terr_year   ON theatrical_window_trends(territory, year);
+CREATE INDEX IF NOT EXISTS idx_fx_code_date       ON currency_exchange_rates(currency_code, rate_date);
+CREATE INDEX IF NOT EXISTS idx_cast_film          ON film_cast(film_id);
+CREATE INDEX IF NOT EXISTS idx_cast_actor         ON film_cast(actor_id);
+CREATE INDEX IF NOT EXISTS idx_festival_film      ON festival_performance(film_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_film     ON marketing_performance(film_id);
+CREATE INDEX IF NOT EXISTS idx_censorship_film    ON censorship_risk_flags(film_id, territory);
+CREATE INDEX IF NOT EXISTS idx_acquisition_film   ON acquisition_deals(film_id);
+CREATE INDEX IF NOT EXISTS idx_mg_genre_terr      ON mg_benchmarks(genre, territory);
+CREATE INDEX IF NOT EXISTS idx_risk_territory     ON territory_risk_index(territory_code);
+
+-- ============================================================
+-- VIEWS for common agent queries
+-- ============================================================
+
+-- View: Film distribution summary (quick acquisition scorecard input)
+CREATE OR REPLACE VIEW vw_film_distribution_summary AS
+SELECT
+    f.film_id,
+    f.title,
+    f.year,
+    f.genre,
+    f.subgenre,
+    f.director,
+    f.production_budget_usd,
+    f.mpaa_rating,
+    f.studio,
+    SUM(b.total_gross_usd)                            AS worldwide_gross_usd,
+    SUM(b.total_gross_usd) / NULLIF(f.production_budget_usd,0) AS worldwide_multiple,
+    COUNT(DISTINCT b.territory)                       AS territory_count,
+    ROUND(AVG(fp.critic_score),2)                     AS avg_critic_score,
+    ROUND(AVG(fp.audience_score),2)                   AS avg_audience_score,
+    MAX(fp.buzz_score)                                AS peak_buzz_score,
+    SUM(mp.p_and_a_spend_usd)                         AS total_marketing_spend_usd
+FROM films f
+LEFT JOIN box_office_performance b  ON f.film_id = b.film_id
+LEFT JOIN festival_performance fp   ON f.film_id = fp.film_id
+LEFT JOIN marketing_performance mp  ON f.film_id = mp.film_id
+GROUP BY f.film_id, f.title, f.year, f.genre, f.subgenre, f.director,
+         f.production_budget_usd, f.mpaa_rating, f.studio;
+
+-- View: Territory risk + theatrical window combined
+CREATE OR REPLACE VIEW vw_territory_acquisition_profile AS
+SELECT
+    r.territory,
+    r.territory_code,
+    r.overall_risk,
+    r.market_attractiveness,
+    r.censorship_risk,
+    r.currency_risk,
+    r.piracy_risk,
+    r.collection_risk,
+    r.notes                          AS risk_notes,
+    w.avg_theatrical_window_days,
+    w.theatrical_revenue_share_pct,
+    w.vod_revenue_share_pct,
+    w.streaming_revenue_share_pct,
+    w.yoy_admissions_change_pct,
+    x.currency_code,
+    x.usd_rate,
+    x.volatility_index
+FROM territory_risk_index r
+LEFT JOIN theatrical_window_trends w
+       ON r.territory = w.territory AND w.year = (SELECT MAX(year) FROM theatrical_window_trends WHERE territory = r.territory)
+LEFT JOIN currency_exchange_rates x
+       ON r.territory = x.territory AND x.rate_date = (SELECT MAX(rate_date) FROM currency_exchange_rates WHERE territory = r.territory);
+
+-- View: Actor power score per film
+CREATE OR REPLACE VIEW vw_film_talent_power AS
+SELECT
+    f.film_id,
+    f.title,
+    COUNT(DISTINCT fc.actor_id)                                   AS cast_size,
+    ROUND(AVG(a.q_score_global), 2)                               AS avg_q_score_global,
+    MAX(a.q_score_global)                                         AS top_q_score_global,
+    SUM(a.instagram_followers_m + a.twitter_followers_m + a.tiktok_followers_m) AS total_social_reach_m,
+    SUM(a.franchise_value_usd)                                    AS total_franchise_value_usd,
+    SUM(a.award_wins)                                             AS total_award_wins
+FROM films f
+JOIN film_cast fc  ON f.film_id = fc.film_id
+JOIN actor_metrics a ON fc.actor_id = a.actor_id
+GROUP BY f.film_id, f.title;
+
+-- ============================================================
+-- END OF SEED DATA
+-- ============================================================

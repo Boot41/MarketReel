@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import db_session
 from app.auth.deps import require_user
-from app.db.models import Message, User
+from app.db.models import User
 from app.services.chats import add_message_and_run, create_chat, get_chat, list_chats
 
 router = APIRouter(prefix="/chats", tags=["chats"])

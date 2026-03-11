@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -43,7 +45,7 @@ class Chat(Base):
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
-    messages: Mapped[list["Message"]] = relationship(
+    messages: Mapped[list[Message]] = relationship(
         back_populates="chat", cascade="all, delete-orphan"
     )
 
@@ -154,9 +156,7 @@ class TheatricalWindow(Base):
 
 class CurrencyRate(Base):
     __tablename__ = "currency_rates"
-    __table_args__ = (
-        UniqueConstraint("currency_code", "rate_date", name="uq_currency_rates"),
-    )
+    __table_args__ = (UniqueConstraint("currency_code", "rate_date", name="uq_currency_rates"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     currency_code: Mapped[str] = mapped_column(String(10), index=True)
@@ -181,3 +181,132 @@ class VodPriceBenchmark(Base):
     window_months: Mapped[int] = mapped_column(Integer)
     price_min_usd: Mapped[float] = mapped_column(Float)
     price_max_usd: Mapped[float] = mapped_column(Float)
+
+
+class FestivalPerformance(Base):
+    __tablename__ = "festival_performance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    film_id: Mapped[int] = mapped_column(ForeignKey("films.id"), index=True)
+    festival_name: Mapped[str] = mapped_column(String(150))
+    festival_year: Mapped[int] = mapped_column(Integer)
+    award_category: Mapped[str] = mapped_column(String(150))
+    award_result: Mapped[str] = mapped_column(String(50))
+    audience_score: Mapped[float] = mapped_column(Float)
+    critic_score: Mapped[float] = mapped_column(Float)
+    buzz_score: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class GenreTerritoryBenchmark(Base):
+    __tablename__ = "genre_territory_benchmarks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    genre: Mapped[str] = mapped_column(String(100), index=True)
+    territory: Mapped[str] = mapped_column(String(100), index=True)
+    territory_code: Mapped[str] = mapped_column(String(2))
+    avg_opening_weekend_usd: Mapped[int] = mapped_column(BigInteger)
+    avg_total_gross_usd: Mapped[int] = mapped_column(BigInteger)
+    avg_multiplier: Mapped[float] = mapped_column(Float)
+    sample_size: Mapped[int] = mapped_column(Integer)
+    year_range_start: Mapped[int] = mapped_column(Integer)
+    year_range_end: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class MarketingPerformance(Base):
+    __tablename__ = "marketing_performance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    film_id: Mapped[int] = mapped_column(ForeignKey("films.id"), index=True)
+    territory: Mapped[str] = mapped_column(String(100), index=True)
+    p_and_a_spend_usd: Mapped[int] = mapped_column(BigInteger)
+    digital_spend_usd: Mapped[int] = mapped_column(BigInteger)
+    tv_spend_usd: Mapped[int] = mapped_column(BigInteger)
+    outdoor_spend_usd: Mapped[int] = mapped_column(BigInteger)
+    social_spend_usd: Mapped[int] = mapped_column(BigInteger)
+    revenue_generated_usd: Mapped[int] = mapped_column(BigInteger)
+    roi_pct: Mapped[float] = mapped_column(Float)
+    campaign_type: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class CensorshipRiskFlag(Base):
+    __tablename__ = "censorship_risk_flags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    film_id: Mapped[int] = mapped_column(ForeignKey("films.id"), index=True)
+    territory: Mapped[str] = mapped_column(String(100), index=True)
+    territory_code: Mapped[str] = mapped_column(String(2))
+    risk_level: Mapped[str] = mapped_column(String(20))
+    content_type: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str] = mapped_column(Text)
+    required_cuts: Mapped[bool] = mapped_column(Boolean, default=False)
+    rating_assigned: Mapped[str] = mapped_column(String(20))
+    approved: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class AcquisitionDeal(Base):
+    __tablename__ = "acquisition_deals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    film_id: Mapped[int] = mapped_column(ForeignKey("films.id"), index=True)
+    territory: Mapped[str] = mapped_column(String(100), index=True)
+    deal_type: Mapped[str] = mapped_column(String(50))
+    minimum_guarantee_usd: Mapped[int] = mapped_column(BigInteger)
+    advance_usd: Mapped[int] = mapped_column(BigInteger)
+    recoupment_threshold_usd: Mapped[int] = mapped_column(BigInteger)
+    backend_pct: Mapped[float] = mapped_column(Float)
+    acquirer: Mapped[str] = mapped_column(String(150))
+    deal_date: Mapped[date] = mapped_column(Date)
+    outcome: Mapped[str] = mapped_column(String(50))
+    actual_revenue_usd: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class StreamingPlatformMarketShare(Base):
+    __tablename__ = "streaming_platform_market_share"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    platform: Mapped[str] = mapped_column(String(100), index=True)
+    territory: Mapped[str] = mapped_column(String(100), index=True)
+    territory_code: Mapped[str] = mapped_column(String(2))
+    year: Mapped[int] = mapped_column(Integer, index=True)
+    subscribers_m: Mapped[float] = mapped_column(Float)
+    market_share_pct: Mapped[float] = mapped_column(Float)
+    avg_monthly_revenue_usd: Mapped[float] = mapped_column(Float)
+    content_budget_usd: Mapped[int] = mapped_column(BigInteger)
+    film_licensing_budget_usd: Mapped[int] = mapped_column(BigInteger)
+
+
+class TerritoryRiskIndex(Base):
+    __tablename__ = "territory_risk_index"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    territory: Mapped[str] = mapped_column(String(100), index=True)
+    territory_code: Mapped[str] = mapped_column(String(2))
+    political_risk: Mapped[float] = mapped_column(Float)
+    currency_risk: Mapped[float] = mapped_column(Float)
+    censorship_risk: Mapped[float] = mapped_column(Float)
+    piracy_risk: Mapped[float] = mapped_column(Float)
+    collection_risk: Mapped[float] = mapped_column(Float)
+    overall_risk: Mapped[float] = mapped_column(Float)
+    market_attractiveness: Mapped[float] = mapped_column(Float)
+    year: Mapped[int] = mapped_column(Integer, index=True)
+    notes: Mapped[str] = mapped_column(Text)
+
+
+class MgBenchmark(Base):
+    __tablename__ = "mg_benchmarks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    genre: Mapped[str] = mapped_column(String(100), index=True)
+    territory_tier: Mapped[str] = mapped_column(String(50), index=True)
+    territory: Mapped[str] = mapped_column(String(100), index=True)
+    budget_range: Mapped[str] = mapped_column(String(100))
+    min_mg_usd: Mapped[int] = mapped_column(BigInteger)
+    max_mg_usd: Mapped[int] = mapped_column(BigInteger)
+    typical_mg_usd: Mapped[int] = mapped_column(BigInteger)
+    notes: Mapped[str] = mapped_column(Text)
+    year_updated: Mapped[int] = mapped_column(Integer, index=True)

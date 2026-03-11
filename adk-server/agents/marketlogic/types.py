@@ -3,17 +3,27 @@ from __future__ import annotations
 from typing import Any, Literal, TypedDict
 
 
-IntentType = Literal["valuation", "risk", "strategy", "full_scorecard"]
+IntentType = Literal["valuation", "risk", "strategy", "full_scorecard", "small_talk"]
+OrchestratorAction = Literal["respond_directly", "ask_clarification", "run_workflow"]
 RiskCategory = Literal["CENSORSHIP", "CULTURAL_SENSITIVITY", "MARKET"]
 RiskSeverity = Literal["LOW", "MEDIUM", "HIGH"]
 
 
 class OrchestratorInput(TypedDict):
     message: str
-    movie: str
-    territory: str
+    movie: str | None
+    territory: str | None
     intent: IntentType
     scenario_override: str | None
+
+
+class OrchestratorRoute(TypedDict):
+    action: OrchestratorAction
+    intent: IntentType
+    movie: str | None
+    territory: str | None
+    missing_fields: list[str]
+    direct_response: str | None
 
 
 class Citation(TypedDict):

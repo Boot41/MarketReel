@@ -18,6 +18,7 @@ from app.core.config import get_settings
 from .orchestrator import (
     build_evidence_request,
     context_matches,
+    decide_action,
     resolve_orchestrator_input,
     run_data_agent,
     run_marketlogic_orchestrator,
@@ -38,6 +39,7 @@ _TEMP_RISK_KEY = "temp:risk"
 _TEMP_VALUATION_KEY = "temp:valuation"
 _TEMP_STRATEGY_KEY = "temp:strategy"
 _TEMP_FOLLOWUP_KEY = "temp:strategy_followup"
+_TEMP_ROUTE_KEY = "temp:orchestrator_route"
 _PROVIDER_FLAG_KEY = "app:provider_enabled"
 
 
@@ -59,13 +61,19 @@ async def _resolve_stage(*, callback_context: Any) -> genai_types.Content:
     session_state = callback_context.state.to_dict()
     message = _content_text(callback_context.user_content)
     orchestrator_input = resolve_orchestrator_input(message=message, session_state=session_state)
+    route = decide_action(orchestrator_input)
     callback_context.state[_TEMP_INPUT_KEY] = orchestrator_input
+    callback_context.state[_TEMP_ROUTE_KEY] = route
     return _model_content("resolved")
 
 
 async def _data_stage(*, callback_context: Any) -> genai_types.Content:
     session_state = callback_context.state.to_dict()
     orchestrator_input = callback_context.state[_TEMP_INPUT_KEY]
+    route = callback_context.state[_TEMP_ROUTE_KEY]
+    if route.get("action") != "run_workflow":
+        callback_context.state[_TEMP_FOLLOWUP_KEY] = False
+        return _model_content("data_skipped")
 
     same_context = context_matches(orchestrator_input, session_state)
     strategy_followup = same_context and orchestrator_input.get("scenario_override") is not None
@@ -82,6 +90,10 @@ async def _data_stage(*, callback_context: Any) -> genai_types.Content:
 
 
 async def _risk_stage(*, callback_context: Any) -> genai_types.Content:
+    route = callback_context.state[_TEMP_ROUTE_KEY]
+    if route.get("action") != "run_workflow":
+        return _model_content("risk_skipped")
+
     session_state = callback_context.state.to_dict()
     evidence = callback_context.state[_TEMP_EVIDENCE_KEY]
     strategy_followup = bool(callback_context.state.get(_TEMP_FOLLOWUP_KEY))
@@ -97,6 +109,10 @@ async def _risk_stage(*, callback_context: Any) -> genai_types.Content:
 
 
 async def _valuation_stage(*, callback_context: Any) -> genai_types.Content:
+    route = callback_context.state[_TEMP_ROUTE_KEY]
+    if route.get("action") != "run_workflow":
+        return _model_content("valuation_skipped")
+
     session_state = callback_context.state.to_dict()
     evidence = callback_context.state[_TEMP_EVIDENCE_KEY]
     risk_flags = callback_context.state[_TEMP_RISK_KEY]
@@ -113,6 +129,10 @@ async def _valuation_stage(*, callback_context: Any) -> genai_types.Content:
 
 
 async def _strategy_stage(*, callback_context: Any) -> genai_types.Content:
+    route = callback_context.state[_TEMP_ROUTE_KEY]
+    if route.get("action") != "run_workflow":
+        return _model_content("strategy_skipped")
+
     orchestrator_input = callback_context.state[_TEMP_INPUT_KEY]
     evidence = callback_context.state[_TEMP_EVIDENCE_KEY]
     risk_flags = callback_context.state[_TEMP_RISK_KEY]
@@ -124,6 +144,12 @@ async def _strategy_stage(*, callback_context: Any) -> genai_types.Content:
 
 
 async def _finalize_stage(*, callback_context: Any) -> genai_types.Content:
+    route = callback_context.state[_TEMP_ROUTE_KEY]
+    if route.get("action") != "run_workflow":
+        text = str(route.get("direct_response") or "Please share more details so I can help.")
+        callback_context.state["last_agent_response_type"] = route.get("action")
+        return _model_content(text)
+
     provider_enabled = bool(callback_context.state.get(_PROVIDER_FLAG_KEY, False))
     orchestrator_input = callback_context.state[_TEMP_INPUT_KEY]
     evidence = callback_context.state[_TEMP_EVIDENCE_KEY]
@@ -287,14 +313,17 @@ async def run_agent(message: str, user_id: str, session_id: str | None) -> tuple
     if not final_text:
         logger.warning("agent_workflow_fallback user_id={} session_id={}", user_id, session.id)
         state = _load_state(session.id, session)
-        scorecard, state_delta = await run_marketlogic_orchestrator(
+        response_payload, state_delta = await run_marketlogic_orchestrator(
             message=message,
             session_state=state,
             provider_enabled=provider_enabled,
         )
         state.update(state_delta)
         _persist_state(session.id, session, state)
-        final_text = json.dumps(scorecard, ensure_ascii=True)
+        if isinstance(response_payload, str):
+            final_text = response_payload
+        else:
+            final_text = json.dumps(response_payload, ensure_ascii=True)
     else:
         refreshed = await session_service.get_session(
             app_name=settings.app_name,
