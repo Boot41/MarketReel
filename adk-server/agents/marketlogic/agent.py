@@ -6,58 +6,20 @@ Used by the ADK server at /v1/run.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
-from google.adk.tools import FunctionTool
 from google.genai import types as genai_types
 from loguru import logger
 
 from app.core.config import get_settings
 from .orchestrator import run_marketlogic_orchestrator
-from .tools import (
-    IndexNavigator,
-    IndexRegistry,
-    SufficiencyChecker,
-    TargetedFetcher,
-    combine_validation_warnings,
-    confidence_threshold_check,
-    financial_sanity_check,
-    format_scorecard,
-    get_actor_qscore,
-    get_box_office_by_genre_territory,
-    get_comparable_films,
-    get_exchange_rates,
-    get_theatrical_window_trends,
-    get_vod_price_benchmarks,
-    hallucination_check,
-    mg_calculator_tool,
-    source_citation_tool,
-)
 
 settings = get_settings()
 
 _PROVIDER_FLAG_KEY = "app:provider_enabled"
-_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-
-
-def _load_prompt(filename: str) -> str:
-    prompt_path = _PROMPTS_DIR / filename
-    if not prompt_path.exists():
-        logger.warning("prompt_file_missing file={}", str(prompt_path))
-        return ""
-    return prompt_path.read_text(encoding="utf-8").strip()
-
-
-ORCHESTRATOR_PROMPT = _load_prompt("MarketLogicOrchestrator_prompt.txt")
-DATA_AGENT_PROMPT = _load_prompt("DataAgent_prompt.txt")
-DOCUMENT_RETRIEVAL_PROMPT = _load_prompt("DocumentRetrievalAgent_prompt.txt")
-VALUATION_AGENT_PROMPT = _load_prompt("ValuationAgent.txt")
-RISK_AGENT_PROMPT = _load_prompt("RiskAgent_prompt.txt")
-STRATEGY_AGENT_PROMPT = _load_prompt("StrategyAgent_prompt.txt")
 
 
 def _content_text(content: genai_types.Content | None) -> str:
@@ -90,68 +52,10 @@ async def _run_stage(*, callback_context: Any) -> genai_types.Content:
     return _model_content(json.dumps(response_payload, ensure_ascii=True))
 
 
-document_retrieval_agent = Agent(
-    name="DocumentRetrievalAgent",
-    model=settings.adk_model,
-    instruction=DOCUMENT_RETRIEVAL_PROMPT,
-    tools=[
-        FunctionTool(IndexRegistry),
-        FunctionTool(IndexNavigator),
-        FunctionTool(TargetedFetcher),
-        FunctionTool(SufficiencyChecker),
-    ],
-)
-
-data_agent = Agent(
-    name="DataAgent",
-    model=settings.adk_model,
-    instruction=DATA_AGENT_PROMPT,
-    tools=[
-        FunctionTool(get_box_office_by_genre_territory),
-        FunctionTool(get_actor_qscore),
-        FunctionTool(get_theatrical_window_trends),
-        FunctionTool(get_exchange_rates),
-        FunctionTool(get_vod_price_benchmarks),
-        FunctionTool(get_comparable_films),
-        FunctionTool(source_citation_tool),
-    ],
-    sub_agents=[document_retrieval_agent],
-)
-
-valuation_agent = Agent(
-    name="ValuationAgent",
-    model=settings.adk_model,
-    instruction=VALUATION_AGENT_PROMPT,
-    tools=[FunctionTool(mg_calculator_tool)],
-)
-
-risk_agent = Agent(
-    name="RiskAgent",
-    model=settings.adk_model,
-    instruction=RISK_AGENT_PROMPT,
-    tools=[],
-)
-
-strategy_agent = Agent(
-    name="StrategyAgent",
-    model=settings.adk_model,
-    instruction=STRATEGY_AGENT_PROMPT,
-    tools=[],
-)
-
 root_agent = Agent(
     name="MarketLogicOrchestrator",
     model=settings.adk_model,
     description="Single-entry workflow orchestrator for film acquisition valuation, risk analysis, and release strategy.",
-    instruction=ORCHESTRATOR_PROMPT,
-    tools=[
-        FunctionTool(financial_sanity_check),
-        FunctionTool(hallucination_check),
-        FunctionTool(confidence_threshold_check),
-        FunctionTool(combine_validation_warnings),
-        FunctionTool(format_scorecard),
-    ],
-    sub_agents=[data_agent, valuation_agent, risk_agent, strategy_agent],
     before_agent_callback=_run_stage,
 )
 

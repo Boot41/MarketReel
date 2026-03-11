@@ -1,30 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar
-
-from ..config import config
-
-T = TypeVar("T")
-
+from typing import Any
 
 def _has_keys(payload: dict[str, Any], required_keys: list[str]) -> bool:
     return all(key in payload for key in required_keys)
-
-
-def run_with_schema_retry(
-    *,
-    run_once: Callable[[], T],
-    validate: Callable[[T], bool],
-    reasoner_name: str,
-) -> tuple[T | None, str | None]:
-    """Run a specialist reasoner with limited schema-only retry."""
-
-    max_attempts = max(1, int(config.schema_retry_limit) + 1)
-    for _ in range(max_attempts):
-        payload = run_once()
-        if validate(payload):
-            return payload, None
-    return None, f"{reasoner_name}_schema_invalid"
 
 
 def validate_valuation_payload(payload: Any) -> bool:

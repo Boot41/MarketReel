@@ -145,7 +145,7 @@ async def test_eval_no_hidden_scorecard_when_tools_fail(monkeypatch: pytest.Monk
     monkeypatch.setattr(orchestrator, "run_data_agent", _fake_run_data_agent)
 
     payload, _ = await orchestrator.run_marketlogic_orchestrator(
-        message="can you evaluate interstellar for india?",
+        message="give me a full scorecard for interstellar in india",
         session_state={},
         provider_enabled=False,
     )

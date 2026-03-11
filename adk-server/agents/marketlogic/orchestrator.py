@@ -84,10 +84,9 @@ def _is_explainability_request(message: str) -> bool:
             "why this",
             "explain",
             "how did you",
-            "show evidence",
-            "show citations",
-            "citations",
-            "sources",
+            "walk me through",
+            "what data",
+            "where did that come from",
             "reasoning",
         ],
     )
@@ -111,6 +110,21 @@ def _is_followup_hint(message: str) -> bool:
     )
 
 
+def _is_evidence_request(message: str) -> bool:
+    msg = _normalize(message)
+    return _contains_any(
+        msg,
+        [
+            "show sources",
+            "show me sources",
+            "what documents",
+            "which pages",
+            "where did you get",
+            "show citations",
+        ],
+    )
+
+
 def _detect_turn_type(message: str, session_state: dict[str, Any]) -> str:
     has_context = isinstance(session_state.get("resolved_context"), dict)
     if _is_greeting(message):
@@ -121,22 +135,33 @@ def _detect_turn_type(message: str, session_state: dict[str, Any]) -> str:
         return "help"
     if _is_clarification_turn(message):
         return "clarification"
-    if has_context and (_is_explainability_request(message) or _is_followup_hint(message)):
+    if has_context and (
+        _is_explainability_request(message) or _is_followup_hint(message) or _is_evidence_request(message)
+    ):
         return "workflow_followup"
     return "workflow_request"
 
 
-def _resolve_workflow_intent(message: str) -> WorkflowIntent:
+def _resolve_workflow_intent(message: str) -> WorkflowIntent | None:
     msg = _normalize(message)
+    if _contains_any(
+        msg,
+        [
+            "full scorecard",
+            "complete analysis",
+            "everything",
+            "full report",
+            "give me everything",
+        ],
+    ):
+        return "full_scorecard"
     if _contains_any(msg, ["censor", "sensitivity", "risk", "ban", "edit"]):
         return "risk"
     if _contains_any(msg, ["mg", "minimum guarantee", "price", "valuation", "pay"]):
         return "valuation"
     if _contains_any(msg, ["release", "window", "marketing", "streaming", "theatrical", "roi"]):
         return "strategy"
-    if _contains_any(msg, ["acquire", "acquisition", "deal", "recommend", "scorecard", "evaluate"]):
-        return "full_scorecard"
-    return "full_scorecard"
+    return None
 
 
 def _match_entity(message: str, options: list[str]) -> str | None:
@@ -200,6 +225,31 @@ def _diagnostic_payload(
 
 def _build_explainability_payload(session_state: dict[str, Any]) -> dict[str, Any]:
     return ExplainabilityReasoner.run(session_state)
+
+
+def _build_evidence_payload(session_state: dict[str, Any]) -> dict[str, Any]:
+    last_scorecard = session_state.get("last_scorecard")
+    citations = []
+    if isinstance(last_scorecard, dict):
+        citations = last_scorecard.get("citations", [])
+    if not isinstance(citations, list) or not citations:
+        return _conversation_payload(
+            "I do not have citation artifacts in this session yet. Run an analysis first.",
+            "clarification_response",
+        )
+
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in citations:
+        if not isinstance(item, dict):
+            continue
+        source = str(item.get("source_path", "unknown"))
+        grouped.setdefault(source, []).append(item)
+
+    return {
+        "response_type": "conversation_response",
+        "message": "Here are the sources from the latest analysis.",
+        "citations_by_source": grouped,
+    }
 
 
 def _required_stages_for_intent(workflow_intent: WorkflowIntent) -> list[str]:
@@ -269,19 +319,33 @@ def decide_action(orchestrator_input: OrchestratorInput, session_state: dict[str
             "direct_response": "Tell me the movie and territory you want to analyze.",
         }
 
-    if turn_type == "workflow_followup" and _is_explainability_request(orchestrator_input["message"]):
-        payload = _build_explainability_payload(session_state)
-        return {
-            "action": "respond_directly",
-            "turn_type": turn_type,
-            "workflow_intent": None,
-            "movie": orchestrator_input["movie"],
-            "territory": orchestrator_input["territory"],
-            "missing_fields": [],
-            "required_stages": [],
-            "response_type": payload["response_type"],
-            "direct_response": json.dumps(payload, ensure_ascii=True),
-        }
+    if turn_type == "workflow_followup":
+        if _is_explainability_request(orchestrator_input["message"]):
+            payload = _build_explainability_payload(session_state)
+            return {
+                "action": "respond_directly",
+                "turn_type": turn_type,
+                "workflow_intent": None,
+                "movie": orchestrator_input["movie"],
+                "territory": orchestrator_input["territory"],
+                "missing_fields": [],
+                "required_stages": [],
+                "response_type": payload["response_type"],
+                "direct_response": json.dumps(payload, ensure_ascii=True),
+            }
+        if _is_evidence_request(orchestrator_input["message"]):
+            payload = _build_evidence_payload(session_state)
+            return {
+                "action": "respond_directly",
+                "turn_type": turn_type,
+                "workflow_intent": None,
+                "movie": orchestrator_input["movie"],
+                "territory": orchestrator_input["territory"],
+                "missing_fields": [],
+                "required_stages": [],
+                "response_type": payload["response_type"],
+                "direct_response": json.dumps(payload, ensure_ascii=True),
+            }
 
     missing_fields: list[str] = []
     if not orchestrator_input.get("movie"):
@@ -302,7 +366,22 @@ def decide_action(orchestrator_input: OrchestratorInput, session_state: dict[str
             "direct_response": _build_clarification(missing_fields),
         }
 
-    workflow_intent = orchestrator_input.get("workflow_intent") or "full_scorecard"
+    workflow_intent = orchestrator_input.get("workflow_intent")
+    if workflow_intent is None:
+        return {
+            "action": "ask_clarification",
+            "turn_type": turn_type,
+            "workflow_intent": None,
+            "movie": orchestrator_input["movie"],
+            "territory": orchestrator_input["territory"],
+            "missing_fields": [],
+            "required_stages": [],
+            "response_type": "clarification_response",
+            "direct_response": (
+                "Please specify whether you want valuation, risk analysis, strategy, "
+                "or a full scorecard."
+            ),
+        }
     return {
         "action": "run_workflow",
         "turn_type": turn_type,
@@ -417,41 +496,6 @@ async def run_strategy_reasoner(
         risk_flags=risk_flags,
         provider_enabled=provider_enabled,
     )
-
-
-async def run_risk_agent(evidence: EvidenceBundle) -> list[RiskFlag]:
-    result, _ = await run_risk_reasoner(evidence=evidence, provider_enabled=False)
-    return result or []
-
-
-async def run_valuation_agent(evidence: EvidenceBundle, risk_flags: list[RiskFlag]) -> ValuationResult:
-    result, _ = await run_valuation_reasoner(
-        evidence=evidence,
-        risk_flags=risk_flags,
-        provider_enabled=False,
-    )
-    if result is None:
-        raise ValueError("valuation_reasoner_schema_invalid")
-    return result
-
-
-async def run_strategy_agent(
-    orchestrator_input: OrchestratorInput,
-    evidence: EvidenceBundle,
-    valuation: ValuationResult,
-    risk_flags: list[RiskFlag],
-) -> StrategyResult:
-    result, _ = await run_strategy_reasoner(
-        orchestrator_input=orchestrator_input,
-        evidence=evidence,
-        valuation=valuation,
-        risk_flags=risk_flags,
-        provider_enabled=False,
-    )
-    if result is None:
-        raise ValueError("strategy_reasoner_schema_invalid")
-    return result
-
 
 def _specialist_failure(reason_code: str, specialist: str) -> dict[str, Any]:
     return {
@@ -858,6 +902,19 @@ async def run_marketlogic_orchestrator(
     warnings = combine_validation_warnings(validation)
     if workflow_intent != "full_scorecard":
         warnings.append(f"Partial workflow executed: {workflow_intent}.")
+
+    if float(evidence.get("data_sufficiency_score", 0.0)) < 0.3:
+        payload = _diagnostic_payload(
+            message=(
+                "I could not return a scorecard because data coverage for this request is too limited."
+            ),
+            reason_code="insufficient_evidence",
+            missing_requirements=["minimum_data_sufficiency_score"],
+            next_action=(
+                "Provide stronger movie/territory context or retry after more market/document data is available."
+            ),
+        )
+        return payload, {"last_agent_response_type": "clarification_response"}
 
     territory = orchestrator_input.get("territory") or "Unknown"
     evidence_basis, degraded_mode = _grounding_metadata(evidence=evidence, workflow_intent=workflow_intent)

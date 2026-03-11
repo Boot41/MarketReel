@@ -71,15 +71,23 @@ async def test_orchestrator_reuses_session_artifacts_for_strategy_followup(monke
     async def _unexpected_run_data_agent(_: dict[str, Any]) -> dict[str, Any]:
         raise AssertionError("run_data_agent should not be called for scenario follow-up reuse")
 
-    async def _unexpected_run_risk_agent(_: dict[str, Any]) -> list[dict[str, Any]]:
-        raise AssertionError("run_risk_agent should not be called for scenario follow-up reuse")
+    async def _unexpected_run_risk_reasoner(
+        _: dict[str, Any], *, provider_enabled: bool
+    ) -> tuple[list[dict[str, Any]] | None, str | None]:
+        _ = provider_enabled
+        raise AssertionError("run_risk_reasoner should not be called for scenario follow-up reuse")
 
-    async def _unexpected_run_valuation_agent(_: dict[str, Any], __: list[dict[str, Any]]) -> dict[str, Any]:
-        raise AssertionError("run_valuation_agent should not be called for scenario follow-up reuse")
+    async def _unexpected_run_valuation_reasoner(
+        *, evidence: dict[str, Any], risk_flags: list[dict[str, Any]], provider_enabled: bool
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        _ = evidence
+        _ = risk_flags
+        _ = provider_enabled
+        raise AssertionError("run_valuation_reasoner should not be called for scenario follow-up reuse")
 
     monkeypatch.setattr(orchestrator, "run_data_agent", _unexpected_run_data_agent)
-    monkeypatch.setattr(orchestrator, "run_risk_agent", _unexpected_run_risk_agent)
-    monkeypatch.setattr(orchestrator, "run_valuation_agent", _unexpected_run_valuation_agent)
+    monkeypatch.setattr(orchestrator, "run_risk_reasoner", _unexpected_run_risk_reasoner)
+    monkeypatch.setattr(orchestrator, "run_valuation_reasoner", _unexpected_run_valuation_reasoner)
 
     session_state = {
         "resolved_context": {
@@ -184,7 +192,7 @@ async def test_orchestrator_blocks_scorecard_on_backend_unavailable(monkeypatch:
     monkeypatch.setattr(orchestrator, "run_data_agent", _fake_run_data_agent)
 
     payload, state_delta = await orchestrator.run_marketlogic_orchestrator(
-        message="can you evaluate interstellar for india?",
+        message="give me a full scorecard for interstellar in india",
         session_state={},
         provider_enabled=False,
     )
@@ -221,7 +229,7 @@ async def test_orchestrator_blocks_scorecard_on_internal_auth_failure(monkeypatc
     monkeypatch.setattr(orchestrator, "run_data_agent", _fake_run_data_agent)
 
     payload, _ = await orchestrator.run_marketlogic_orchestrator(
-        message="can you evaluate interstellar for india?",
+        message="give me a full scorecard for interstellar in india",
         session_state={},
         provider_enabled=False,
     )
@@ -229,6 +237,45 @@ async def test_orchestrator_blocks_scorecard_on_internal_auth_failure(monkeypatc
     assert payload["response_type"] == "clarification_response"
     assert payload["reason_code"] == "internal_auth_failed"
     assert "valid_internal_api_auth" in payload["missing_requirements"]
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_handles_evidence_followup_without_workflow_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _unexpected_run_data_agent(_: dict[str, Any]) -> dict[str, Any]:
+        raise AssertionError("run_data_agent should not be called for evidence follow-up")
+
+    monkeypatch.setattr(orchestrator, "run_data_agent", _unexpected_run_data_agent)
+
+    session_state = {
+        "resolved_context": {
+            "movie": "Interstellar",
+            "territory": "India",
+            "workflow_intent": "full_scorecard",
+            "scenario_override": None,
+        },
+        "last_scorecard": {
+            "citations": [
+                {
+                    "source_path": "docs/reviews/interstellar.md",
+                    "doc_id": "r1",
+                    "page": 1,
+                    "excerpt": "good",
+                }
+            ]
+        },
+    }
+
+    payload, state_delta = await orchestrator.run_marketlogic_orchestrator(
+        message="show me sources",
+        session_state=session_state,
+        provider_enabled=False,
+    )
+
+    assert payload["response_type"] == "conversation_response"
+    assert "citations_by_source" in payload
+    assert state_delta["last_agent_response_type"] == "conversation_response"
 
 
 @pytest.mark.asyncio
@@ -310,7 +357,7 @@ async def test_orchestrator_returns_clarification_on_strategy_schema_failure(
     monkeypatch.setattr(orchestrator, "run_strategy_reasoner", _fake_run_strategy_reasoner)
 
     payload, state_delta = await orchestrator.run_marketlogic_orchestrator(
-        message="evaluate interstellar for india",
+        message="give me a full scorecard for interstellar in india",
         session_state={},
         provider_enabled=True,
     )
