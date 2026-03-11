@@ -26,7 +26,6 @@ from .tools import (
     source_citation_tool,
 )
 from .types import (
-    Citation,
     EvidenceBundle,
     EvidenceRequest,
     IntentType,
@@ -109,13 +108,32 @@ def _build_evidence_request(orchestrator_input: OrchestratorInput) -> EvidenceRe
     }
 
 
+def _expand_retrieval_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    expanded = dict(plan)
+    max_docs = int(plan.get("max_docs", 10))
+    max_scenes = int(plan.get("max_scenes", 6))
+    expanded["max_docs"] = min(20, max_docs + 6)
+    expanded["max_scenes"] = min(12, max_scenes + 4)
+    return expanded
+
+
 async def run_data_agent(request: EvidenceRequest) -> EvidenceBundle:
     movie = request["movie"]
     territory = request["territory"]
 
-    plan = IndexNavigator(movie=movie, territory=territory, intent=request["intent"])
-    fetched = TargetedFetcher(plan)
-    sufficiency = SufficiencyChecker(fetched)
+    fetched: dict[str, list[dict[str, Any]]] = {"documents": [], "scenes": []}
+    sufficiency: dict[str, Any] = {"status": "EXPAND", "score": 0.0}
+    if request["needs_docs"]:
+        plan = IndexNavigator(movie=movie, territory=territory, intent=request["intent"])
+        fetched = TargetedFetcher(plan)
+        sufficiency = SufficiencyChecker(fetched)
+        if sufficiency.get("status") != "PASS":
+            expanded_plan = _expand_retrieval_plan(plan)
+            expanded_fetch = TargetedFetcher(expanded_plan)
+            expanded_sufficiency = SufficiencyChecker(expanded_fetch)
+            if float(expanded_sufficiency.get("score", 0.0)) >= float(sufficiency.get("score", 0.0)):
+                fetched = expanded_fetch
+                sufficiency = expanded_sufficiency
 
     all_records = fetched.get("documents", []) + fetched.get("scenes", [])
     citations = source_citation_tool(all_records)
@@ -153,6 +171,29 @@ async def run_data_agent(request: EvidenceRequest) -> EvidenceBundle:
         "citations": citations,
         "data_sufficiency_score": float(sufficiency.get("score", 0.0)),
     }
+
+
+def _context_matches(orchestrator_input: OrchestratorInput, session_state: dict[str, Any]) -> bool:
+    previous_context = session_state.get("resolved_context")
+    if not isinstance(previous_context, dict):
+        return False
+    prev_movie = str(previous_context.get("movie", "")).strip()
+    prev_territory = str(previous_context.get("territory", "")).strip()
+    return bool(prev_movie and prev_territory) and _normalize(prev_movie) == _normalize(
+        orchestrator_input["movie"]
+    ) and _normalize(prev_territory) == _normalize(orchestrator_input["territory"])
+
+
+def _session_dict(session_state: dict[str, Any], key: str) -> dict[str, Any] | None:
+    value = session_state.get(key)
+    return value if isinstance(value, dict) else None
+
+
+def _session_risk(session_state: dict[str, Any]) -> list[RiskFlag] | None:
+    value = session_state.get("risk")
+    if not isinstance(value, list):
+        return None
+    return value
 
 
 def _estimate_risk_penalty(risk_flags: list[RiskFlag]) -> float:
@@ -364,12 +405,32 @@ async def run_marketlogic_orchestrator(
         orchestrator_input.get("scenario_override") or "none",
     )
 
-    evidence_request = _build_evidence_request(orchestrator_input)
-    evidence = await run_data_agent(evidence_request)
+    same_context = _context_matches(orchestrator_input, session_state)
+    strategy_followup = same_context and orchestrator_input.get("scenario_override") is not None
 
-    risk_task = asyncio.create_task(run_risk_agent(evidence))
-    risk_flags = await risk_task
-    valuation = await run_valuation_agent(evidence=evidence, risk_flags=risk_flags)
+    previous_evidence = _session_dict(session_state, "evidence_bundle")
+    previous_risk = _session_risk(session_state)
+    previous_valuation = _session_dict(session_state, "valuation")
+
+    if strategy_followup and previous_evidence is not None:
+        logger.debug("orchestrator_reuse_evidence movie={} territory={}", orchestrator_input["movie"], orchestrator_input["territory"])
+        evidence: EvidenceBundle = previous_evidence  # type: ignore[assignment]
+    else:
+        evidence_request = _build_evidence_request(orchestrator_input)
+        evidence = await run_data_agent(evidence_request)
+
+    if strategy_followup and previous_risk is not None:
+        logger.debug("orchestrator_reuse_risk movie={} territory={}", orchestrator_input["movie"], orchestrator_input["territory"])
+        risk_flags = previous_risk
+    else:
+        risk_flags = await run_risk_agent(evidence)
+
+    if strategy_followup and previous_valuation is not None:
+        logger.debug("orchestrator_reuse_valuation movie={} territory={}", orchestrator_input["movie"], orchestrator_input["territory"])
+        valuation: ValuationResult = previous_valuation  # type: ignore[assignment]
+    else:
+        valuation = await run_valuation_agent(evidence=evidence, risk_flags=risk_flags)
+
     strategy = await run_strategy_agent(orchestrator_input, evidence, valuation, risk_flags)
 
     exchange = evidence.get("db_evidence", {}).get("exchange_rates", {})
