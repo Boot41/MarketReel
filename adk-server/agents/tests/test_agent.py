@@ -229,3 +229,93 @@ async def test_orchestrator_blocks_scorecard_on_internal_auth_failure(monkeypatc
     assert payload["response_type"] == "clarification_response"
     assert payload["reason_code"] == "internal_auth_failed"
     assert "valid_internal_api_auth" in payload["missing_requirements"]
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_returns_clarification_on_strategy_schema_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_run_data_agent(_: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "movie": "Interstellar",
+            "territory": "India",
+            "intent": "full_scorecard",
+            "document_evidence": {"documents": [], "scenes": []},
+            "db_evidence": {
+                "box_office": {"samples": 3, "avg_gross_usd": 1000000.0},
+                "comparable_films": [{"title": "X", "territory_gross_usd": 2000000.0}],
+                "exchange_rates": {"currency_code": "INR", "rate_to_usd": 83.0},
+            },
+            "citations": [
+                {"source_path": "docs/reviews/interstellar.md", "doc_id": "r1", "page": 1, "excerpt": "good"},
+                {"source_path": "docs/synopses/interstellar.md", "doc_id": "s1", "page": 1, "excerpt": "good"},
+                {"source_path": "docs/marketing/interstellar.md", "doc_id": "m1", "page": 1, "excerpt": "good"},
+            ],
+            "data_sufficiency_score": 0.8,
+            "tool_diagnostics": [],
+            "tool_failure_count": 0,
+        }
+
+    async def _fake_run_risk_reasoner(
+        _: dict[str, Any], *, provider_enabled: bool
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        _ = provider_enabled
+        return (
+            [
+                {
+                    "category": "MARKET",
+                    "severity": "LOW",
+                    "scene_ref": "market_baseline",
+                    "source_ref": "derived:baseline",
+                    "mitigation": "Baseline checks.",
+                    "confidence": 0.5,
+                }
+            ],
+            None,
+        )
+
+    async def _fake_run_valuation_reasoner(
+        *, evidence: dict[str, Any], risk_flags: list[dict[str, Any]], provider_enabled: bool
+    ) -> tuple[dict[str, Any], str | None]:
+        _ = evidence
+        _ = risk_flags
+        _ = provider_enabled
+        return (
+            {
+                "mg_estimate_usd": 1000000.0,
+                "confidence_interval_low_usd": 800000.0,
+                "confidence_interval_high_usd": 1200000.0,
+                "theatrical_projection_usd": 2200000.0,
+                "vod_projection_usd": 900000.0,
+                "comparable_films": ["X"],
+                "sufficiency_score": 0.8,
+            },
+            None,
+        )
+
+    async def _fake_run_strategy_reasoner(
+        _orchestrator_input: dict[str, Any],
+        _evidence: dict[str, Any],
+        _valuation: dict[str, Any],
+        _risk_flags: list[dict[str, Any]],
+        *,
+        provider_enabled: bool,
+    ) -> tuple[None, str]:
+        _ = provider_enabled
+        return None, "strategy_reasoner_schema_invalid"
+
+    monkeypatch.setattr(orchestrator, "run_data_agent", _fake_run_data_agent)
+    monkeypatch.setattr(orchestrator, "run_risk_reasoner", _fake_run_risk_reasoner)
+    monkeypatch.setattr(orchestrator, "run_valuation_reasoner", _fake_run_valuation_reasoner)
+    monkeypatch.setattr(orchestrator, "run_strategy_reasoner", _fake_run_strategy_reasoner)
+
+    payload, state_delta = await orchestrator.run_marketlogic_orchestrator(
+        message="evaluate interstellar for india",
+        session_state={},
+        provider_enabled=True,
+    )
+
+    assert payload["response_type"] == "clarification_response"
+    assert payload["reason_code"] == "strategy_reasoner_schema_invalid"
+    assert "valid_structured_reasoning_output" in payload["missing_requirements"]
+    assert state_delta["last_agent_response_type"] == "clarification_response"

@@ -480,6 +480,8 @@ def format_scorecard(
     citations: list[Citation],
     confidence: float,
     warnings: list[str],
+    evidence_basis: str,
+    degraded_mode: dict[str, Any],
     response_type: str,
 ) -> Scorecard:
     return {
@@ -498,6 +500,8 @@ def format_scorecard(
         "citations": citations,
         "confidence": round(confidence, 3),
         "warnings": warnings,
+        "evidence_basis": evidence_basis,
+        "degraded_mode": degraded_mode,
         "response_type": response_type,
     }
 

@@ -114,6 +114,9 @@ async def test_eval_scorecard_contract_fields() -> None:
     assert "marketing_spend_usd" in scorecard
     assert "platform_priority" in scorecard
     assert "roi_scenarios" in scorecard
+    assert scorecard["evidence_basis"] in {"grounded", "benchmark_derived"}
+    assert isinstance(scorecard["degraded_mode"], dict)
+    assert "enabled" in scorecard["degraded_mode"]
 
 
 @pytest.mark.asyncio

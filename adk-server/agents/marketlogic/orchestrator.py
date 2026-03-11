@@ -6,9 +6,10 @@ from typing import Any
 from loguru import logger
 
 from .sub_agents.data_agent import DataAgent
-from .sub_agents.risk_agent import RiskAgent
-from .sub_agents.strategy_agent import StrategyAgent
-from .sub_agents.valuation_agent import ValuationAgent
+from .sub_agents.explainability_reasoner import ExplainabilityReasoner
+from .sub_agents.risk_reasoner import RiskReasoner
+from .sub_agents.strategy_reasoner import StrategyReasoner
+from .sub_agents.valuation_reasoner import ValuationReasoner
 from .tools import (
     IndexRegistry,
     combine_validation_warnings,
@@ -198,29 +199,7 @@ def _diagnostic_payload(
 
 
 def _build_explainability_payload(session_state: dict[str, Any]) -> dict[str, Any]:
-    last_scorecard = session_state.get("last_scorecard")
-    evidence_bundle = session_state.get("evidence_bundle")
-    if not isinstance(last_scorecard, dict) or not isinstance(evidence_bundle, dict):
-        return _conversation_payload(
-            "I do not have prior analytical artifacts in this session yet. Run an analysis first.",
-            "clarification_response",
-        )
-
-    citations = last_scorecard.get("citations", [])
-    top_citations = citations[:3] if isinstance(citations, list) else []
-    confidence = last_scorecard.get("confidence")
-    warnings = last_scorecard.get("warnings", [])
-
-    return {
-        "response_type": "conversation_response",
-        "message": "Here is the evidence summary from the latest analysis in this session.",
-        "explainability": {
-            "confidence": confidence,
-            "warnings": warnings if isinstance(warnings, list) else [],
-            "top_citations": top_citations,
-            "data_sufficiency_score": evidence_bundle.get("data_sufficiency_score", 0.0),
-        },
-    }
+    return ExplainabilityReasoner.run(session_state)
 
 
 def _required_stages_for_intent(workflow_intent: WorkflowIntent) -> list[str]:
@@ -402,12 +381,58 @@ async def run_data_agent(request: EvidenceRequest) -> EvidenceBundle:
     return await DataAgent.run(request)
 
 
+async def run_risk_reasoner(
+    evidence: EvidenceBundle,
+    *,
+    provider_enabled: bool,
+) -> tuple[list[RiskFlag] | None, str | None]:
+    return await RiskReasoner.run(evidence=evidence, provider_enabled=provider_enabled)
+
+
+async def run_valuation_reasoner(
+    evidence: EvidenceBundle,
+    risk_flags: list[RiskFlag],
+    *,
+    provider_enabled: bool,
+) -> tuple[ValuationResult | None, str | None]:
+    return await ValuationReasoner.run(
+        evidence=evidence,
+        risk_flags=risk_flags,
+        provider_enabled=provider_enabled,
+    )
+
+
+async def run_strategy_reasoner(
+    orchestrator_input: OrchestratorInput,
+    evidence: EvidenceBundle,
+    valuation: ValuationResult,
+    risk_flags: list[RiskFlag],
+    *,
+    provider_enabled: bool,
+) -> tuple[StrategyResult | None, str | None]:
+    return await StrategyReasoner.run(
+        orchestrator_input=orchestrator_input,
+        evidence=evidence,
+        valuation=valuation,
+        risk_flags=risk_flags,
+        provider_enabled=provider_enabled,
+    )
+
+
 async def run_risk_agent(evidence: EvidenceBundle) -> list[RiskFlag]:
-    return await RiskAgent.run(evidence)
+    result, _ = await run_risk_reasoner(evidence=evidence, provider_enabled=False)
+    return result or []
 
 
 async def run_valuation_agent(evidence: EvidenceBundle, risk_flags: list[RiskFlag]) -> ValuationResult:
-    return await ValuationAgent.run(evidence, risk_flags)
+    result, _ = await run_valuation_reasoner(
+        evidence=evidence,
+        risk_flags=risk_flags,
+        provider_enabled=False,
+    )
+    if result is None:
+        raise ValueError("valuation_reasoner_schema_invalid")
+    return result
 
 
 async def run_strategy_agent(
@@ -416,7 +441,27 @@ async def run_strategy_agent(
     valuation: ValuationResult,
     risk_flags: list[RiskFlag],
 ) -> StrategyResult:
-    return await StrategyAgent.run(orchestrator_input, evidence, valuation, risk_flags)
+    result, _ = await run_strategy_reasoner(
+        orchestrator_input=orchestrator_input,
+        evidence=evidence,
+        valuation=valuation,
+        risk_flags=risk_flags,
+        provider_enabled=False,
+    )
+    if result is None:
+        raise ValueError("strategy_reasoner_schema_invalid")
+    return result
+
+
+def _specialist_failure(reason_code: str, specialist: str) -> dict[str, Any]:
+    return {
+        "reason_code": reason_code,
+        "missing_requirements": ["valid_structured_reasoning_output"],
+        "next_action": (
+            f"{specialist} could not produce schema-valid output after retry. "
+            "Retry the request or narrow the scope (valuation/risk/strategy)."
+        ),
+    }
 
 
 def run_validation(
@@ -428,7 +473,7 @@ def run_validation(
 ) -> ValidationReport:
     warnings: list[str] = []
     if not provider_enabled:
-        warnings.append("Model provider key not configured; using deterministic orchestrator path.")
+        warnings.append("Model provider key not configured; using deterministic specialist path.")
     if evidence["data_sufficiency_score"] < 0.55:
         warnings.append("Data sufficiency is low for this territory/movie combination.")
 
@@ -470,6 +515,8 @@ def _build_scorecard(
     strategy: StrategyResult | None,
     warnings: list[str],
     confidence: float,
+    evidence_basis: str,
+    degraded_mode: dict[str, Any],
 ) -> Scorecard:
     theatrical_projection = valuation["theatrical_projection_usd"] if valuation else 0.0
     vod_projection = valuation["vod_projection_usd"] if valuation else 0.0
@@ -495,8 +542,29 @@ def _build_scorecard(
         citations=evidence["citations"],
         confidence=confidence,
         warnings=warnings,
+        evidence_basis=evidence_basis,
+        degraded_mode=degraded_mode,
         response_type="scorecard_response",
     )
+
+
+def _grounding_metadata(
+    evidence: EvidenceBundle,
+    workflow_intent: WorkflowIntent,
+) -> tuple[str, dict[str, Any]]:
+    db = evidence.get("db_evidence", {})
+    box_office = db.get("box_office", {})
+    comparables = db.get("comparable_films", [])
+    citations = evidence.get("citations", [])
+    sufficiency = float(evidence.get("data_sufficiency_score", 0.0))
+    tool_failures = int(evidence.get("tool_failure_count", 0))
+    market_signal = int(box_office.get("samples", 0)) > 0 or len(comparables) > 0
+    citation_ok = len(citations) >= (2 if workflow_intent == "risk" else 3)
+
+    grounded = market_signal and citation_ok and sufficiency >= 0.55 and tool_failures == 0
+    if grounded:
+        return "grounded", {"enabled": False, "reason_code": None}
+    return "benchmark_derived", {"enabled": True, "reason_code": "limited_market_grounding"}
 
 
 def _evidence_failure_reason(
@@ -673,7 +741,20 @@ async def run_marketlogic_orchestrator(
             )
             risk_flags = previous_risk
         else:
-            risk_flags = await run_risk_agent(evidence)
+            risk_result, risk_error = await run_risk_reasoner(
+                evidence,
+                provider_enabled=provider_enabled,
+            )
+            if risk_result is None:
+                failure = _specialist_failure(risk_error or "risk_reasoner_schema_invalid", "Risk reasoner")
+                payload = _diagnostic_payload(
+                    message="I could not generate a reliable scorecard because reasoning output failed validation.",
+                    reason_code=failure["reason_code"],
+                    missing_requirements=failure["missing_requirements"],
+                    next_action=failure["next_action"],
+                )
+                return payload, {"last_agent_response_type": "clarification_response"}
+            risk_flags = risk_result
 
     valuation: ValuationResult | None = None
     if "valuation" in required_stages:
@@ -688,15 +769,81 @@ async def run_marketlogic_orchestrator(
             )
             valuation = previous_valuation  # type: ignore[assignment]
         else:
-            valuation = await run_valuation_agent(evidence=evidence, risk_flags=risk_flags)
+            valuation_result, valuation_error = await run_valuation_reasoner(
+                evidence=evidence,
+                risk_flags=risk_flags,
+                provider_enabled=provider_enabled,
+            )
+            if valuation_result is None:
+                failure = _specialist_failure(
+                    valuation_error or "valuation_reasoner_schema_invalid",
+                    "Valuation reasoner",
+                )
+                payload = _diagnostic_payload(
+                    message="I could not generate a reliable scorecard because reasoning output failed validation.",
+                    reason_code=failure["reason_code"],
+                    missing_requirements=failure["missing_requirements"],
+                    next_action=failure["next_action"],
+                )
+                return payload, {"last_agent_response_type": "clarification_response"}
+            valuation = valuation_result
 
     strategy: StrategyResult | None = None
     if "strategy" in required_stages:
         if valuation is None:
-            valuation = await run_valuation_agent(evidence=evidence, risk_flags=risk_flags)
+            valuation_result, valuation_error = await run_valuation_reasoner(
+                evidence=evidence,
+                risk_flags=risk_flags,
+                provider_enabled=provider_enabled,
+            )
+            if valuation_result is None:
+                failure = _specialist_failure(
+                    valuation_error or "valuation_reasoner_schema_invalid",
+                    "Valuation reasoner",
+                )
+                payload = _diagnostic_payload(
+                    message="I could not generate a reliable scorecard because reasoning output failed validation.",
+                    reason_code=failure["reason_code"],
+                    missing_requirements=failure["missing_requirements"],
+                    next_action=failure["next_action"],
+                )
+                return payload, {"last_agent_response_type": "clarification_response"}
+            valuation = valuation_result
         if not risk_flags:
-            risk_flags = await run_risk_agent(evidence)
-        strategy = await run_strategy_agent(orchestrator_input, evidence, valuation, risk_flags)
+            risk_result, risk_error = await run_risk_reasoner(
+                evidence,
+                provider_enabled=provider_enabled,
+            )
+            if risk_result is None:
+                failure = _specialist_failure(risk_error or "risk_reasoner_schema_invalid", "Risk reasoner")
+                payload = _diagnostic_payload(
+                    message="I could not generate a reliable scorecard because reasoning output failed validation.",
+                    reason_code=failure["reason_code"],
+                    missing_requirements=failure["missing_requirements"],
+                    next_action=failure["next_action"],
+                )
+                return payload, {"last_agent_response_type": "clarification_response"}
+            risk_flags = risk_result
+        strategy_result, strategy_error = await run_strategy_reasoner(
+            orchestrator_input,
+            evidence,
+            valuation,
+            risk_flags,
+            provider_enabled=provider_enabled,
+        )
+        if strategy_result is None:
+            failure = _specialist_failure(
+                strategy_error or "strategy_reasoner_schema_invalid",
+                "Strategy reasoner",
+            )
+            payload = _diagnostic_payload(
+                message="I could not generate a reliable scorecard because reasoning output failed validation.",
+                reason_code=failure["reason_code"],
+                missing_requirements=failure["missing_requirements"],
+                next_action=failure["next_action"],
+            )
+            return payload, {"last_agent_response_type": "clarification_response"}
+        strategy = strategy_result
 
     confidence = _compute_confidence(evidence=evidence, valuation=valuation)
     include_financial = workflow_intent in {"valuation", "strategy", "full_scorecard"}
@@ -713,6 +860,7 @@ async def run_marketlogic_orchestrator(
         warnings.append(f"Partial workflow executed: {workflow_intent}.")
 
     territory = orchestrator_input.get("territory") or "Unknown"
+    evidence_basis, degraded_mode = _grounding_metadata(evidence=evidence, workflow_intent=workflow_intent)
     scorecard = _build_scorecard(
         territory=territory,
         evidence=evidence,
@@ -721,6 +869,8 @@ async def run_marketlogic_orchestrator(
         strategy=strategy,
         warnings=warnings,
         confidence=confidence,
+        evidence_basis=evidence_basis,
+        degraded_mode=degraded_mode,
     )
 
     exchange = evidence.get("db_evidence", {}).get("exchange_rates", {})

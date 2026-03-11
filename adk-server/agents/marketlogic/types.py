@@ -100,6 +100,11 @@ class ValidationReport(TypedDict):
     warnings: list[str]
 
 
+class DegradedMode(TypedDict):
+    enabled: bool
+    reason_code: str | None
+
+
 class Scorecard(TypedDict):
     projected_revenue_by_territory: dict[str, float]
     risk_flags: list[RiskFlag]
@@ -111,4 +116,6 @@ class Scorecard(TypedDict):
     citations: list[Citation]
     confidence: float
     warnings: list[str]
+    evidence_basis: Literal["grounded", "benchmark_derived"]
+    degraded_mode: DegradedMode
     response_type: ResponseType
