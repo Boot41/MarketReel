@@ -28,6 +28,11 @@ class ValuationAgent:
         box_office = db.get("box_office", {})
         actor_signals = db.get("actor_signals", {})
         comparables = db.get("comparable_films", [])
+        tool_diagnostics = evidence.get("tool_diagnostics", [])
+        has_db_tool_failure = any(
+            isinstance(item, dict) and str(item.get("source", "")).startswith("db")
+            for item in tool_diagnostics
+        )
 
         comparable_values = [float(item.get("territory_gross_usd", 0.0)) for item in comparables]
         comparable_avg = sum(comparable_values) / len(comparable_values) if comparable_values else 0.0
@@ -37,6 +42,7 @@ class ValuationAgent:
             avg_qscore=float(actor_signals.get("avg_qscore", 0.0)),
             comparable_avg_gross_usd=float(comparable_avg),
             risk_penalty=cls._estimate_risk_penalty(risk_flags),
+            allow_baseline_fallback=not has_db_tool_failure,
         )
 
         theatrical_projection = max(

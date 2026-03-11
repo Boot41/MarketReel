@@ -114,3 +114,38 @@ async def test_eval_scorecard_contract_fields() -> None:
     assert "marketing_spend_usd" in scorecard
     assert "platform_priority" in scorecard
     assert "roi_scenarios" in scorecard
+
+
+@pytest.mark.asyncio
+async def test_eval_no_hidden_scorecard_when_tools_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fake_run_data_agent(_: dict[str, object]) -> dict[str, object]:
+        return {
+            "movie": "Interstellar",
+            "territory": "India",
+            "intent": "full_scorecard",
+            "document_evidence": {"documents": [], "scenes": []},
+            "db_evidence": {},
+            "citations": [],
+            "data_sufficiency_score": 0.0,
+            "tool_diagnostics": [
+                {
+                    "source": "db",
+                    "endpoint": "/internal/v1/market/box-office",
+                    "error_type": "network",
+                    "status_code": None,
+                    "message": "connect failed",
+                }
+            ],
+            "tool_failure_count": 1,
+        }
+
+    monkeypatch.setattr(orchestrator, "run_data_agent", _fake_run_data_agent)
+
+    payload, _ = await orchestrator.run_marketlogic_orchestrator(
+        message="can you evaluate interstellar for india?",
+        session_state={},
+        provider_enabled=False,
+    )
+
+    assert payload["response_type"] == "clarification_response"
+    assert payload["reason_code"] == "backend_unavailable"

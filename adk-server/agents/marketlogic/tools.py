@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import time
+from contextvars import ContextVar
 from functools import lru_cache
 from typing import Any
 from uuid import uuid4
 
 import httpx
+from loguru import logger
 
 from app.core.config import get_settings
 from .types import Citation, Scorecard, ValidationReport
 
 settings = get_settings()
+_tool_diagnostics_var: ContextVar[list[dict[str, Any]]] = ContextVar(
+    "tool_diagnostics", default=[]
+)
 
 
 def _normalize(value: str) -> str:
@@ -26,6 +31,62 @@ def _backend_headers() -> dict[str, str]:
         "X-Internal-API-Key": _internal_api_key(),
         "X-Request-ID": str(uuid4()),
     }
+
+
+def reset_tool_diagnostics() -> None:
+    _tool_diagnostics_var.set([])
+
+
+def get_tool_diagnostics() -> list[dict[str, Any]]:
+    diagnostics = _tool_diagnostics_var.get()
+    return [dict(item) for item in diagnostics]
+
+
+def _record_tool_failure(
+    *,
+    source: str,
+    error_type: str,
+    endpoint: str,
+    status_code: int | None = None,
+    message: str | None = None,
+) -> None:
+    diagnostics = list(_tool_diagnostics_var.get())
+    diagnostics.append(
+        {
+            "source": source,
+            "error_type": error_type,
+            "endpoint": endpoint,
+            "status_code": status_code,
+            "message": message or "",
+        }
+    )
+    _tool_diagnostics_var.set(diagnostics)
+    logger.warning(
+        "tool_call_failed source={} endpoint={} error_type={} status_code={} message={}",
+        source,
+        endpoint,
+        error_type,
+        status_code or 0,
+        message or "",
+    )
+
+
+def _classify_status_error(status_code: int) -> str:
+    if status_code in {401, 403}:
+        return "auth"
+    if status_code in {408, 429, 500, 502, 503, 504}:
+        return "backend_unavailable"
+    return "request_error"
+
+
+def _classify_exception(exc: Exception) -> str:
+    if isinstance(exc, httpx.TimeoutException):
+        return "timeout"
+    if isinstance(exc, httpx.ConnectError):
+        return "network"
+    if isinstance(exc, httpx.NetworkError):
+        return "network"
+    return "unknown"
 
 
 def _retry_delays() -> list[float]:
@@ -65,13 +126,42 @@ async def _request_json(
             if response.is_success:
                 return response.json()
             if not _should_retry(None, response.status_code):
+                _record_tool_failure(
+                    source="db",
+                    endpoint=path,
+                    error_type=_classify_status_error(response.status_code),
+                    status_code=response.status_code,
+                    message=f"http_{response.status_code}",
+                )
                 return {}
             last_exception = RuntimeError(f"backend_status_{response.status_code}")
         except Exception as exc:
             if not _should_retry(exc, None):
+                _record_tool_failure(
+                    source="db",
+                    endpoint=path,
+                    error_type=_classify_exception(exc),
+                    message=str(exc),
+                )
                 return {}
             last_exception = exc
     if last_exception is not None:
+        if isinstance(last_exception, RuntimeError) and "backend_status_" in str(last_exception):
+            status_code = int(str(last_exception).split("_")[-1])
+            _record_tool_failure(
+                source="db",
+                endpoint=path,
+                error_type=_classify_status_error(status_code),
+                status_code=status_code,
+                message=str(last_exception),
+            )
+        else:
+            _record_tool_failure(
+                source="db",
+                endpoint=path,
+                error_type=_classify_exception(last_exception),
+                message=str(last_exception),
+            )
         return {}
     return {}
 
@@ -102,13 +192,42 @@ def _request_json_sync(
             if response.is_success:
                 return response.json()
             if not _should_retry(None, response.status_code):
+                _record_tool_failure(
+                    source="docs",
+                    endpoint=path,
+                    error_type=_classify_status_error(response.status_code),
+                    status_code=response.status_code,
+                    message=f"http_{response.status_code}",
+                )
                 return {}
             last_exception = RuntimeError(f"backend_status_{response.status_code}")
         except Exception as exc:
             if not _should_retry(exc, None):
+                _record_tool_failure(
+                    source="docs",
+                    endpoint=path,
+                    error_type=_classify_exception(exc),
+                    message=str(exc),
+                )
                 return {}
             last_exception = exc
     if last_exception is not None:
+        if isinstance(last_exception, RuntimeError) and "backend_status_" in str(last_exception):
+            status_code = int(str(last_exception).split("_")[-1])
+            _record_tool_failure(
+                source="docs",
+                endpoint=path,
+                error_type=_classify_status_error(status_code),
+                status_code=status_code,
+                message=str(last_exception),
+            )
+        else:
+            _record_tool_failure(
+                source="docs",
+                endpoint=path,
+                error_type=_classify_exception(last_exception),
+                message=str(last_exception),
+            )
         return {}
     return {}
 
@@ -305,13 +424,19 @@ def mg_calculator_tool(
     avg_qscore: float,
     comparable_avg_gross_usd: float,
     risk_penalty: float,
+    allow_baseline_fallback: bool = True,
 ) -> float:
     base = comparable_avg_gross_usd * 0.12 if comparable_avg_gross_usd > 0 else avg_box_office_usd * 0.08
     if base <= 0:
-        base = 1_200_000.0
+        if allow_baseline_fallback:
+            base = 1_200_000.0
+        else:
+            base = 0.0
     talent_multiplier = 1.0 + min(0.25, max(0.0, avg_qscore / 400.0))
     sanitized_penalty = min(0.6, max(0.0, risk_penalty))
     mg = base * talent_multiplier * (1.0 - sanitized_penalty)
+    if mg <= 0:
+        return 0.0
     return round(max(250_000.0, mg), 2)
 
 

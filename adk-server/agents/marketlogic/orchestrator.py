@@ -183,6 +183,20 @@ def _conversation_payload(message: str, response_type: ResponseType) -> dict[str
     }
 
 
+def _diagnostic_payload(
+    *,
+    message: str,
+    reason_code: str,
+    missing_requirements: list[str],
+    next_action: str,
+) -> dict[str, Any]:
+    payload = _conversation_payload(message, "clarification_response")
+    payload["reason_code"] = reason_code
+    payload["missing_requirements"] = missing_requirements
+    payload["next_action"] = next_action
+    return payload
+
+
 def _build_explainability_payload(session_state: dict[str, Any]) -> dict[str, Any]:
     last_scorecard = session_state.get("last_scorecard")
     evidence_bundle = session_state.get("evidence_bundle")
@@ -379,7 +393,9 @@ def session_risk(session_state: dict[str, Any]) -> list[RiskFlag] | None:
 
 
 def evidence_cache_valid(evidence: dict[str, Any]) -> bool:
-    return float(evidence.get("data_sufficiency_score", 0.0)) >= 0.55
+    return float(evidence.get("data_sufficiency_score", 0.0)) >= 0.55 and int(
+        evidence.get("tool_failure_count", 0)
+    ) == 0
 
 
 async def run_data_agent(request: EvidenceRequest) -> EvidenceBundle:
@@ -483,6 +499,74 @@ def _build_scorecard(
     )
 
 
+def _evidence_failure_reason(
+    evidence: EvidenceBundle,
+    workflow_intent: WorkflowIntent,
+    *,
+    allow_strategy_reuse_without_market: bool,
+) -> dict[str, Any] | None:
+    diagnostics = evidence.get("tool_diagnostics", [])
+    for item in diagnostics:
+        if not isinstance(item, dict):
+            continue
+        error_type = str(item.get("error_type", ""))
+        if error_type == "auth":
+            return {
+                "reason_code": "internal_auth_failed",
+                "missing_requirements": ["valid_internal_api_auth"],
+                "next_action": "Verify ADK and backend internal API keys match and retry.",
+            }
+
+    for item in diagnostics:
+        if not isinstance(item, dict):
+            continue
+        error_type = str(item.get("error_type", ""))
+        if error_type in {"network", "timeout", "backend_unavailable", "unknown"}:
+            return {
+                "reason_code": "backend_unavailable",
+                "missing_requirements": ["reachable_backend_internal_api"],
+                "next_action": "Ensure backend service is running and reachable from ADK server, then retry.",
+            }
+
+    db = evidence.get("db_evidence", {})
+    box_office = db.get("box_office", {})
+    comparables = db.get("comparable_films", [])
+    citation_count = len(evidence.get("citations", []))
+    doc_records = evidence.get("document_evidence", {}).get("documents", [])
+    risk_docs = 0
+    for item in doc_records:
+        source = str(item.get("source_path", ""))
+        if "censorship" in source or "cultural_sensitivity" in source:
+            risk_docs += 1
+
+    market_signal = int(box_office.get("samples", 0)) > 0 or len(comparables) > 0
+
+    missing: list[str] = []
+    if workflow_intent == "valuation":
+        if not market_signal:
+            missing.append("market_signals")
+    elif workflow_intent == "risk":
+        if risk_docs == 0 and citation_count < 2:
+            missing.append("risk_evidence")
+    else:
+        if not market_signal:
+            missing.append("market_signals")
+        if citation_count < 3:
+            missing.append("citations")
+        if float(evidence.get("data_sufficiency_score", 0.0)) < 0.55:
+            missing.append("data_sufficiency")
+        if workflow_intent == "strategy" and allow_strategy_reuse_without_market:
+            missing = [item for item in missing if item not in {"market_signals", "citations"}]
+
+    if missing:
+        return {
+            "reason_code": "insufficient_evidence",
+            "missing_requirements": missing,
+            "next_action": "Provide stronger movie/territory context or retry after data services are available.",
+        }
+    return None
+
+
 async def run_marketlogic_orchestrator(
     message: str,
     session_state: dict[str, Any],
@@ -543,6 +627,40 @@ async def run_marketlogic_orchestrator(
     else:
         evidence_request = build_evidence_request(orchestrator_input)
         evidence = await run_data_agent(evidence_request)
+
+    evidence_failure = _evidence_failure_reason(
+        evidence,
+        workflow_intent,
+        allow_strategy_reuse_without_market=bool(previous_valuation and is_followup and same_context),
+    )
+    if evidence_failure is not None:
+        logger.warning(
+            "orchestrator_evidence_blocked movie={} territory={} intent={} reason={}",
+            orchestrator_input.get("movie") or "none",
+            orchestrator_input.get("territory") or "none",
+            workflow_intent,
+            evidence_failure["reason_code"],
+        )
+        message_text = (
+            "I could not generate a reliable scorecard because required evidence was unavailable."
+        )
+        payload = _diagnostic_payload(
+            message=message_text,
+            reason_code=evidence_failure["reason_code"],
+            missing_requirements=evidence_failure["missing_requirements"],
+            next_action=evidence_failure["next_action"],
+        )
+        state_delta = {
+            "resolved_context": {
+                "movie": orchestrator_input.get("movie"),
+                "territory": orchestrator_input.get("territory"),
+                "workflow_intent": workflow_intent,
+                "scenario_override": orchestrator_input.get("scenario_override"),
+            },
+            "evidence_bundle": evidence,
+            "last_agent_response_type": "clarification_response",
+        }
+        return payload, state_delta
 
     risk_flags: list[RiskFlag] = []
     if "risk" in required_stages:

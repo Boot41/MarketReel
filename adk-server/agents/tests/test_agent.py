@@ -156,3 +156,76 @@ async def test_orchestrator_asks_for_missing_context_on_analytic_prompt() -> Non
     assert reply["response_type"] == "clarification_response"
     assert "movie title and target territory" in str(reply.get("message", ""))
     assert state_delta["last_agent_response_type"] == "clarification_response"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_blocks_scorecard_on_backend_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fake_run_data_agent(_: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "movie": "Interstellar",
+            "territory": "India",
+            "intent": "full_scorecard",
+            "document_evidence": {"documents": [], "scenes": []},
+            "db_evidence": {},
+            "citations": [],
+            "data_sufficiency_score": 0.1,
+            "tool_diagnostics": [
+                {
+                    "source": "db",
+                    "endpoint": "/internal/v1/market/box-office",
+                    "error_type": "network",
+                    "status_code": None,
+                    "message": "connect failed",
+                }
+            ],
+            "tool_failure_count": 1,
+        }
+
+    monkeypatch.setattr(orchestrator, "run_data_agent", _fake_run_data_agent)
+
+    payload, state_delta = await orchestrator.run_marketlogic_orchestrator(
+        message="can you evaluate interstellar for india?",
+        session_state={},
+        provider_enabled=False,
+    )
+
+    assert payload["response_type"] == "clarification_response"
+    assert payload["reason_code"] == "backend_unavailable"
+    assert "reachable_backend_internal_api" in payload["missing_requirements"]
+    assert state_delta["last_agent_response_type"] == "clarification_response"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_blocks_scorecard_on_internal_auth_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fake_run_data_agent(_: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "movie": "Interstellar",
+            "territory": "India",
+            "intent": "full_scorecard",
+            "document_evidence": {"documents": [], "scenes": []},
+            "db_evidence": {},
+            "citations": [],
+            "data_sufficiency_score": 0.1,
+            "tool_diagnostics": [
+                {
+                    "source": "db",
+                    "endpoint": "/internal/v1/market/box-office",
+                    "error_type": "auth",
+                    "status_code": 401,
+                    "message": "http_401",
+                }
+            ],
+            "tool_failure_count": 1,
+        }
+
+    monkeypatch.setattr(orchestrator, "run_data_agent", _fake_run_data_agent)
+
+    payload, _ = await orchestrator.run_marketlogic_orchestrator(
+        message="can you evaluate interstellar for india?",
+        session_state={},
+        provider_enabled=False,
+    )
+
+    assert payload["response_type"] == "clarification_response"
+    assert payload["reason_code"] == "internal_auth_failed"
+    assert "valid_internal_api_auth" in payload["missing_requirements"]

@@ -62,6 +62,8 @@ class EvidenceBundle(TypedDict):
     db_evidence: dict[str, Any]
     citations: list[Citation]
     data_sufficiency_score: float
+    tool_diagnostics: list[dict[str, Any]]
+    tool_failure_count: int
 
 
 class ValuationResult(TypedDict):
