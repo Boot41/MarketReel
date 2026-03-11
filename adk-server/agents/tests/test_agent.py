@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from agents.marketlogic import orchestrator  # noqa: E402
+from agents.marketlogic.sub_agents import data_agent as data_agent_module  # noqa: E402
+from agents.marketlogic.sub_agents import document_retrieval_agent as retrieval_module  # noqa: E402
 
 
 @pytest.mark.asyncio
@@ -39,9 +41,13 @@ async def test_run_data_agent_expands_when_initial_fetch_is_insufficient(monkeyp
             "scenes": [{"doc_id": "s1", "source_path": "scripts/a.md", "text": "scene"}],
         }
 
-    monkeypatch.setattr(orchestrator, "IndexNavigator", _fake_navigator)
-    monkeypatch.setattr(orchestrator, "TargetedFetcher", _fake_fetcher)
-    monkeypatch.setattr(orchestrator, "source_citation_tool", lambda items: [{"source_path": item["source_path"]} for item in items])
+    monkeypatch.setattr(retrieval_module, "IndexNavigator", _fake_navigator)
+    monkeypatch.setattr(retrieval_module, "TargetedFetcher", _fake_fetcher)
+    monkeypatch.setattr(
+        data_agent_module,
+        "source_citation_tool",
+        lambda items: [{"source_path": item["source_path"]} for item in items],
+    )
 
     bundle = await orchestrator.run_data_agent(
         {
