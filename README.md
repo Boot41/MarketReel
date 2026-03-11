@@ -36,12 +36,12 @@ Full-stack scaffold with FastAPI + React + PostgreSQL + Google ADK. Three servic
 │   └── pyproject.toml           # Dependencies + tool config
 ├── adk-server/                  # Google ADK service
 │   ├── app/
-│   │   ├── agent.py             # ADK root agent
 │   │   ├── core/                # Config
 │   │   └── main.py              # ADK FastAPI app
-│   ├── agents/                  # Agent assets + docs
-│   │   ├── marketlogic/          # MarketLogic agent sample (mirrors runtime agent)
-│   │   ├── docs/                 # Agent docs
+│   ├── docs/                    # Shared/common documents for all agents
+│   ├── agents/                  # Agent code + agent-scoped assets
+│   │   ├── marketlogic/          # Runtime MarketLogic agent
+│   │   │   ├── docs/             # Docs used only by the MarketLogic agent
 │   │   ├── eval/                 # Evaluation harness
 │   │   └── tests/                # Agent-specific tests
 │   ├── tests/                   # ADK server tests
@@ -88,6 +88,16 @@ npm run dev
 
 App runs at http://localhost:5173 with API proxied to :8010.
 ADK server runs at http://localhost:8011 and is called by the backend.
+
+## Seeding MarketLogic Data
+
+From `server/`, run:
+
+```bash
+uv run python scripts/seed_marketlogic.py
+```
+
+This loads mock datasets from `server/app/db/seed_data/` and prints inserted counts.
 
 ## Environment Setup
 
@@ -169,6 +179,10 @@ docker build -t app-scaffold .
 ## Google ADK Agent
 
 A sample agent is provided at `adk-server/agents/marketlogic/agent.py`. It uses the `google-adk` SDK with Gemini models.
+
+Document convention:
+- `adk-server/docs/` contains shared documents reusable by multiple agents.
+- `adk-server/agents/<agent_name>/docs/` contains documents scoped to that specific agent only.
 
 To customize:
 1. Edit `adk-server/agents/marketlogic/agent.py` — define tools and the `root_agent`

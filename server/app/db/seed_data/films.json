@@ -1,0 +1,92 @@
+[
+  {
+    "title": "Dunkirk",
+    "release_year": 2017,
+    "runtime_min": 106,
+    "budget_usd": 85000000,
+    "logline": "Allied soldiers attempt a perilous evacuation while under siege from air and sea.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/dunkirk.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/dunkirk.md"
+  },
+  {
+    "title": "Inside Out",
+    "release_year": 2015,
+    "runtime_min": 95,
+    "budget_usd": 175000000,
+    "logline": "A girl’s emotions must work together after a sudden life change.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/inside_out.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/inside_out.md"
+  },
+  {
+    "title": "Interstellar",
+    "release_year": 2014,
+    "runtime_min": 169,
+    "budget_usd": 160000000,
+    "logline": "A team of explorers travels through a wormhole in search of a new home for humanity.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/interstellar.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/interstellar.md"
+  },
+  {
+    "title": "Avengers Endgame",
+    "release_year": 2019,
+    "runtime_min": 181,
+    "budget_usd": 300000000,
+    "logline": "The remaining heroes attempt a final mission to undo catastrophic loss.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/avengers_endgame.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/avengers_endgame.md"
+  },
+  {
+    "title": "Deadpool",
+    "release_year": 2016,
+    "runtime_min": 108,
+    "budget_usd": 58000000,
+    "logline": "A mercenary with a twisted sense of humor hunts the man who ruined his life.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/deadpool.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/deadpool.md"
+  },
+  {
+    "title": "Ford V Ferrari",
+    "release_year": 2019,
+    "runtime_min": 152,
+    "budget_usd": 97000000,
+    "logline": "A visionary car designer and a fearless driver take on an iconic race team.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/ford_v_ferrari.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/ford_v_ferrari.md"
+  },
+  {
+    "title": "How To Train Your Dragon",
+    "release_year": 2010,
+    "runtime_min": 98,
+    "budget_usd": 165000000,
+    "logline": "A young Viking forms an unlikely bond with a dragon and changes his village forever.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/how_to_train_your_dragon.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/how_to_train_your_dragon.md"
+  },
+  {
+    "title": "La La Land",
+    "release_year": 2016,
+    "runtime_min": 128,
+    "budget_usd": 30000000,
+    "logline": "Two dreamers in Los Angeles navigate love and ambition in a modern musical.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/la_la_land.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/la_la_land.md"
+  },
+  {
+    "title": "Lion King",
+    "release_year": 1994,
+    "runtime_min": 88,
+    "budget_usd": 45000000,
+    "logline": "A young lion must reclaim his place after tragedy strikes his pride.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/lion_king.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/lion_king.md"
+  },
+  {
+    "title": "Tenet",
+    "release_year": 2020,
+    "runtime_min": 150,
+    "budget_usd": 200000000,
+    "logline": "An operative manipulates time to prevent a global catastrophe.",
+    "synopsis_doc_path": "adk-server/agents/marketlogic/docs/synopses/tenet.md",
+    "script_doc_path": "adk-server/agents/marketlogic/docs/scripts/tenet.md"
+  }
+]

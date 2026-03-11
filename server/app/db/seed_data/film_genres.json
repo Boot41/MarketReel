@@ -1,0 +1,21 @@
+[
+  {"film_title": "Dunkirk", "release_year": 2017, "genre": "Drama"},
+  {"film_title": "Dunkirk", "release_year": 2017, "genre": "Action"},
+  {"film_title": "Inside Out", "release_year": 2015, "genre": "Comedy"},
+  {"film_title": "Inside Out", "release_year": 2015, "genre": "Drama"},
+  {"film_title": "Interstellar", "release_year": 2014, "genre": "Sci-Fi"},
+  {"film_title": "Interstellar", "release_year": 2014, "genre": "Drama"},
+  {"film_title": "Avengers Endgame", "release_year": 2019, "genre": "Action"},
+  {"film_title": "Avengers Endgame", "release_year": 2019, "genre": "Sci-Fi"},
+  {"film_title": "Deadpool", "release_year": 2016, "genre": "Action"},
+  {"film_title": "Deadpool", "release_year": 2016, "genre": "Comedy"},
+  {"film_title": "Ford V Ferrari", "release_year": 2019, "genre": "Drama"},
+  {"film_title": "Ford V Ferrari", "release_year": 2019, "genre": "Action"},
+  {"film_title": "How To Train Your Dragon", "release_year": 2010, "genre": "Action"},
+  {"film_title": "How To Train Your Dragon", "release_year": 2010, "genre": "Comedy"},
+  {"film_title": "La La Land", "release_year": 2016, "genre": "Romance"},
+  {"film_title": "La La Land", "release_year": 2016, "genre": "Drama"},
+  {"film_title": "Lion King", "release_year": 1994, "genre": "Drama"},
+  {"film_title": "Tenet", "release_year": 2020, "genre": "Sci-Fi"},
+  {"film_title": "Tenet", "release_year": 2020, "genre": "Thriller"}
+]

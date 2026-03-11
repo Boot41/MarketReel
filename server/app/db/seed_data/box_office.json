@@ -1,0 +1,31 @@
+[
+  {"film_title": "Dunkirk", "release_year": 2017, "territory": "United States", "genre": "Drama", "gross_local": 55.2, "gross_usd": 55.2, "admissions": 4200000, "release_date": "2017-07-21"},
+  {"film_title": "Dunkirk", "release_year": 2017, "territory": "United Kingdom", "genre": "Drama", "gross_local": 28.4, "gross_usd": 36.0, "admissions": 2300000, "release_date": "2017-07-21"},
+
+  {"film_title": "Inside Out", "release_year": 2015, "territory": "United States", "genre": "Comedy", "gross_local": 90.1, "gross_usd": 90.1, "admissions": 7200000, "release_date": "2015-06-19"},
+  {"film_title": "Inside Out", "release_year": 2015, "territory": "Japan", "genre": "Comedy", "gross_local": 35.6, "gross_usd": 24.2, "admissions": 2800000, "release_date": "2015-07-18"},
+
+  {"film_title": "Interstellar", "release_year": 2014, "territory": "United States", "genre": "Sci-Fi", "gross_local": 58.0, "gross_usd": 58.0, "admissions": 4300000, "release_date": "2014-11-07"},
+  {"film_title": "Interstellar", "release_year": 2014, "territory": "Germany", "genre": "Sci-Fi", "gross_local": 22.4, "gross_usd": 24.4, "admissions": 2000000, "release_date": "2014-11-06"},
+
+  {"film_title": "Avengers Endgame", "release_year": 2019, "territory": "United States", "genre": "Action", "gross_local": 210.3, "gross_usd": 210.3, "admissions": 15200000, "release_date": "2019-04-26"},
+  {"film_title": "Avengers Endgame", "release_year": 2019, "territory": "South Korea", "genre": "Action", "gross_local": 61.2, "gross_usd": 46.5, "admissions": 5200000, "release_date": "2019-04-24"},
+
+  {"film_title": "Deadpool", "release_year": 2016, "territory": "United States", "genre": "Action", "gross_local": 72.4, "gross_usd": 72.4, "admissions": 5600000, "release_date": "2016-02-12"},
+  {"film_title": "Deadpool", "release_year": 2016, "territory": "Canada", "genre": "Comedy", "gross_local": 15.8, "gross_usd": 11.7, "admissions": 1200000, "release_date": "2016-02-12"},
+
+  {"film_title": "Ford V Ferrari", "release_year": 2019, "territory": "United States", "genre": "Drama", "gross_local": 45.7, "gross_usd": 45.7, "admissions": 3400000, "release_date": "2019-11-15"},
+  {"film_title": "Ford V Ferrari", "release_year": 2019, "territory": "France", "genre": "Drama", "gross_local": 18.9, "gross_usd": 20.1, "admissions": 1500000, "release_date": "2019-11-13"},
+
+  {"film_title": "How To Train Your Dragon", "release_year": 2010, "territory": "United States", "genre": "Action", "gross_local": 70.3, "gross_usd": 70.3, "admissions": 6200000, "release_date": "2010-03-26"},
+  {"film_title": "How To Train Your Dragon", "release_year": 2010, "territory": "United Kingdom", "genre": "Action", "gross_local": 22.1, "gross_usd": 28.0, "admissions": 2000000, "release_date": "2010-03-31"},
+
+  {"film_title": "La La Land", "release_year": 2016, "territory": "United States", "genre": "Romance", "gross_local": 45.0, "gross_usd": 45.0, "admissions": 3500000, "release_date": "2016-12-09"},
+  {"film_title": "La La Land", "release_year": 2016, "territory": "France", "genre": "Romance", "gross_local": 14.5, "gross_usd": 15.6, "admissions": 1200000, "release_date": "2017-01-25"},
+
+  {"film_title": "Lion King", "release_year": 1994, "territory": "United States", "genre": "Drama", "gross_local": 95.8, "gross_usd": 95.8, "admissions": 8200000, "release_date": "1994-06-24"},
+  {"film_title": "Lion King", "release_year": 1994, "territory": "Japan", "genre": "Drama", "gross_local": 28.9, "gross_usd": 19.6, "admissions": 2300000, "release_date": "1994-07-23"},
+
+  {"film_title": "Tenet", "release_year": 2020, "territory": "United States", "genre": "Sci-Fi", "gross_local": 37.8, "gross_usd": 37.8, "admissions": 2800000, "release_date": "2020-09-03"},
+  {"film_title": "Tenet", "release_year": 2020, "territory": "United Kingdom", "genre": "Sci-Fi", "gross_local": 12.6, "gross_usd": 16.0, "admissions": 980000, "release_date": "2020-08-26"}
+]

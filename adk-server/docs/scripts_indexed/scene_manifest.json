@@ -1,0 +1,65 @@
+{
+  "scripts": [
+    {
+      "doc_id": "avengers_endgame",
+      "movie": "Avengers Endgame",
+      "scenes": 92,
+      "source_path": "scripts/avengers_endgame.md"
+    },
+    {
+      "doc_id": "deadpool",
+      "movie": "Deadpool",
+      "scenes": 0,
+      "source_path": "scripts/deadpool.md"
+    },
+    {
+      "doc_id": "dunkirk",
+      "movie": "Dunkirk",
+      "scenes": 165,
+      "source_path": "scripts/dunkirk.md"
+    },
+    {
+      "doc_id": "ford_v_ferrari",
+      "movie": "Ford V Ferrari",
+      "scenes": 243,
+      "source_path": "scripts/ford_v_ferrari.md"
+    },
+    {
+      "doc_id": "how_to_train_your_dragon",
+      "movie": "How To Train Your Dragon",
+      "scenes": 286,
+      "source_path": "scripts/how_to_train_your_dragon.md"
+    },
+    {
+      "doc_id": "inside_out",
+      "movie": "Inside Out",
+      "scenes": 398,
+      "source_path": "scripts/inside_out.md"
+    },
+    {
+      "doc_id": "interstellar",
+      "movie": "Interstellar",
+      "scenes": 511,
+      "source_path": "scripts/interstellar.md"
+    },
+    {
+      "doc_id": "la_la_land",
+      "movie": "La La Land",
+      "scenes": 575,
+      "source_path": "scripts/la_la_land.md"
+    },
+    {
+      "doc_id": "lion_king",
+      "movie": "Lion King",
+      "scenes": 0,
+      "source_path": "scripts/lion_king.md"
+    },
+    {
+      "doc_id": "tenet",
+      "movie": "Tenet",
+      "scenes": 681,
+      "source_path": "scripts/tenet.md"
+    }
+  ],
+  "total_scenes": 681
+}

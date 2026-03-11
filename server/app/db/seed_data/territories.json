@@ -1,0 +1,10 @@
+[
+  {"name": "United States", "region_code": "NA", "currency_code": "USD"},
+  {"name": "Canada", "region_code": "NA", "currency_code": "CAD"},
+  {"name": "United Kingdom", "region_code": "EU", "currency_code": "GBP"},
+  {"name": "France", "region_code": "EU", "currency_code": "EUR"},
+  {"name": "Germany", "region_code": "EU", "currency_code": "EUR"},
+  {"name": "South Korea", "region_code": "APAC", "currency_code": "KRW"},
+  {"name": "Japan", "region_code": "APAC", "currency_code": "JPY"},
+  {"name": "Brazil", "region_code": "LATAM", "currency_code": "BRL"}
+]

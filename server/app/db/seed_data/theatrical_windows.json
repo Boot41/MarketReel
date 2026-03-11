@@ -1,0 +1,18 @@
+[
+  {"territory": "United States", "window_type": "theatrical_to_vod", "days": 45},
+  {"territory": "United States", "window_type": "theatrical_to_svod", "days": 120},
+  {"territory": "Canada", "window_type": "theatrical_to_vod", "days": 50},
+  {"territory": "Canada", "window_type": "theatrical_to_svod", "days": 125},
+  {"territory": "United Kingdom", "window_type": "theatrical_to_vod", "days": 60},
+  {"territory": "United Kingdom", "window_type": "theatrical_to_svod", "days": 135},
+  {"territory": "France", "window_type": "theatrical_to_vod", "days": 90},
+  {"territory": "France", "window_type": "theatrical_to_svod", "days": 150},
+  {"territory": "Germany", "window_type": "theatrical_to_vod", "days": 70},
+  {"territory": "Germany", "window_type": "theatrical_to_svod", "days": 140},
+  {"territory": "South Korea", "window_type": "theatrical_to_vod", "days": 40},
+  {"territory": "South Korea", "window_type": "theatrical_to_svod", "days": 110},
+  {"territory": "Japan", "window_type": "theatrical_to_vod", "days": 55},
+  {"territory": "Japan", "window_type": "theatrical_to_svod", "days": 130},
+  {"territory": "Brazil", "window_type": "theatrical_to_vod", "days": 35},
+  {"territory": "Brazil", "window_type": "theatrical_to_svod", "days": 100}
+]

@@ -1,0 +1,485 @@
+{
+  "documents": [
+    {
+      "doc_id": "avengers_endgame_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/avengers_endgame_censorship_guidelines.json",
+      "movie": "Avengers Endgame Censorship"
+    },
+    {
+      "doc_id": "deadpool_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/deadpool_censorship_guidelines.json",
+      "movie": "Deadpool Censorship"
+    },
+    {
+      "doc_id": "dunkirk_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/dunkirk_censorship_guidelines.json",
+      "movie": "Dunkirk Censorship"
+    },
+    {
+      "doc_id": "ford_ferrari_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/ford_ferrari_censorship_guidelines.json",
+      "movie": "Ford Ferrari Censorship"
+    },
+    {
+      "doc_id": "how_to_train_dragon_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/how_to_train_dragon_censorship_guidelines.json",
+      "movie": "How To Train Dragon Censorship"
+    },
+    {
+      "doc_id": "inside_out_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/inside_out_censorship_guidelines.json",
+      "movie": "Inside Out Censorship"
+    },
+    {
+      "doc_id": "interstellar_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/interstellar_censorship_guidelines.json",
+      "movie": "Interstellar Censorship"
+    },
+    {
+      "doc_id": "la_la_land_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/la_la_land_censorship_guidelines.json",
+      "movie": "La La Land Censorship"
+    },
+    {
+      "doc_id": "lion_king_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/lion_king_censorship_guidelines.json",
+      "movie": "Lion King Censorship"
+    },
+    {
+      "doc_id": "tenet_censorship_guidelines",
+      "doc_type": "censorship",
+      "pages": 1,
+      "source_path": "docs/censorship/json/tenet_censorship_guidelines.json",
+      "movie": "Tenet Censorship"
+    },
+    {
+      "doc_id": "censorship_guidelines_australia",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_australia.json",
+      "country": "Australia"
+    },
+    {
+      "doc_id": "censorship_guidelines_china",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_china.json",
+      "country": "China"
+    },
+    {
+      "doc_id": "censorship_guidelines_germany",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_germany.json",
+      "country": "Germany"
+    },
+    {
+      "doc_id": "censorship_guidelines_india",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_india.json",
+      "country": "India"
+    },
+    {
+      "doc_id": "censorship_guidelines_japan",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_japan.json",
+      "country": "Japan"
+    },
+    {
+      "doc_id": "censorship_guidelines_russia",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_russia.json",
+      "country": "Russia"
+    },
+    {
+      "doc_id": "censorship_guidelines_saudi_arabia",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_saudi_arabia.json",
+      "country": "Saudi Arabia"
+    },
+    {
+      "doc_id": "censorship_guidelines_uae_middle_east",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_uae_middle_east.json",
+      "country": "Uae Middle East"
+    },
+    {
+      "doc_id": "censorship_guidelines_united_kingdom",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_united_kingdom.json",
+      "country": "United Kingdom"
+    },
+    {
+      "doc_id": "censorship_guidelines_united_states",
+      "doc_type": "censorship_guidelines_countries",
+      "pages": 1,
+      "source_path": "docs/censorship_guidelines_countries/json/censorship_guidelines_united_states.json",
+      "country": "United States"
+    },
+    {
+      "doc_id": "avengers_endgame_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/avengers_endgame_cultural_sensitivity.json",
+      "movie": "Avengers Endgame Cultural"
+    },
+    {
+      "doc_id": "deadpool_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/deadpool_cultural_sensitivity.json",
+      "movie": "Deadpool Cultural"
+    },
+    {
+      "doc_id": "dunkirk_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/dunkirk_cultural_sensitivity.json",
+      "movie": "Dunkirk Cultural"
+    },
+    {
+      "doc_id": "ford_ferrari_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/ford_ferrari_cultural_sensitivity.json",
+      "movie": "Ford Ferrari Cultural"
+    },
+    {
+      "doc_id": "how_to_train_dragon_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/how_to_train_dragon_cultural_sensitivity.json",
+      "movie": "How To Train Dragon Cultural"
+    },
+    {
+      "doc_id": "inside_out_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/inside_out_cultural_sensitivity.json",
+      "movie": "Inside Out Cultural"
+    },
+    {
+      "doc_id": "interstellar_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/interstellar_cultural_sensitivity.json",
+      "movie": "Interstellar Cultural"
+    },
+    {
+      "doc_id": "la_la_land_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/la_la_land_cultural_sensitivity.json",
+      "movie": "La La Land Cultural"
+    },
+    {
+      "doc_id": "lion_king_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/lion_king_cultural_sensitivity.json",
+      "movie": "Lion King Cultural"
+    },
+    {
+      "doc_id": "tenet_cultural_sensitivity",
+      "doc_type": "cultural_sensitivity",
+      "pages": 1,
+      "source_path": "docs/cultural_sensitivity/json/tenet_cultural_sensitivity.json",
+      "movie": "Tenet Cultural"
+    },
+    {
+      "doc_id": "avengers_endgame_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/avengers_endgame_marketing_strategy.json",
+      "movie": "Avengers Endgame Marketing"
+    },
+    {
+      "doc_id": "deadpool_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/deadpool_marketing_strategy.json",
+      "movie": "Deadpool Marketing"
+    },
+    {
+      "doc_id": "dunkirk_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/dunkirk_marketing_strategy.json",
+      "movie": "Dunkirk Marketing"
+    },
+    {
+      "doc_id": "ford_ferrari_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/ford_ferrari_marketing_strategy.json",
+      "movie": "Ford Ferrari Marketing"
+    },
+    {
+      "doc_id": "how_to_train_dragon_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/how_to_train_dragon_marketing_strategy.json",
+      "movie": "How To Train Dragon Marketing"
+    },
+    {
+      "doc_id": "inside_out_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/inside_out_marketing_strategy.json",
+      "movie": "Inside Out Marketing"
+    },
+    {
+      "doc_id": "interstellar_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/interstellar_marketing_strategy.json",
+      "movie": "Interstellar Marketing"
+    },
+    {
+      "doc_id": "la_la_land_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/la_la_land_marketing_strategy.json",
+      "movie": "La La Land Marketing"
+    },
+    {
+      "doc_id": "lion_king_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/lion_king_marketing_strategy.json",
+      "movie": "Lion King Marketing"
+    },
+    {
+      "doc_id": "tenet_marketing_strategy",
+      "doc_type": "marketing",
+      "pages": 1,
+      "source_path": "docs/marketing/json/tenet_marketing_strategy.json",
+      "movie": "Tenet Marketing"
+    },
+    {
+      "doc_id": "avengers-endgame",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/avengers-endgame.json",
+      "movie": "Avengers Endgame",
+      "primary_genre": "Action",
+      "secondary_genre": "Sci-Fi / Superhero",
+      "release_year": 2019,
+      "imdb_rating": 8.4
+    },
+    {
+      "doc_id": "deadpool",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/deadpool.json",
+      "movie": "Deadpool",
+      "primary_genre": "Action",
+      "secondary_genre": "Comedy / Sci-Fi",
+      "release_year": 2016,
+      "imdb_rating": 8.0
+    },
+    {
+      "doc_id": "dunkirk",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/dunkirk.json",
+      "movie": "Dunkirk",
+      "primary_genre": "War",
+      "secondary_genre": "Drama / History",
+      "release_year": 2017,
+      "imdb_rating": 7.8
+    },
+    {
+      "doc_id": "ford-v-ferrari",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/ford-v-ferrari.json",
+      "movie": "Ford v Ferrari"
+    },
+    {
+      "doc_id": "how-to-train-your-dragon",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/how-to-train-your-dragon.json",
+      "movie": "How to Train Your Dragon"
+    },
+    {
+      "doc_id": "inside-out",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/inside-out.json",
+      "movie": "Inside Out",
+      "primary_genre": "Animation",
+      "secondary_genre": "Comedy / Drama",
+      "release_year": 2015,
+      "imdb_rating": 8.1
+    },
+    {
+      "doc_id": "interstellar",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/interstellar.json",
+      "movie": "Interstellar",
+      "primary_genre": "Sci-Fi",
+      "secondary_genre": "Drama / Adventure",
+      "release_year": 2014,
+      "imdb_rating": 8.7
+    },
+    {
+      "doc_id": "la-la-land",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/la-la-land.json",
+      "movie": "La La Land",
+      "primary_genre": "Musical",
+      "secondary_genre": "Romance / Drama",
+      "release_year": 2016,
+      "imdb_rating": 8.0
+    },
+    {
+      "doc_id": "tenet",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/tenet.json",
+      "movie": "Tenet",
+      "primary_genre": "Action",
+      "secondary_genre": "Sci-Fi / Thriller",
+      "release_year": 2020,
+      "imdb_rating": 7.3
+    },
+    {
+      "doc_id": "the-lion-king",
+      "doc_type": "reviews",
+      "pages": 1,
+      "source_path": "docs/reviews/json/the-lion-king.json",
+      "movie": "The Lion King",
+      "primary_genre": "Animation",
+      "secondary_genre": "Adventure / Musical",
+      "release_year": 1994,
+      "imdb_rating": 8.5
+    },
+    {
+      "doc_id": "avengers_endgame_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/avengers_endgame_synopsis.json",
+      "movie": "Avengers Endgame",
+      "primary_genre": "Action",
+      "secondary_genre": "Sci-Fi / Superhero",
+      "release_year": 2019,
+      "imdb_rating": 8.4
+    },
+    {
+      "doc_id": "deadpool_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/deadpool_synopsis.json",
+      "movie": "Deadpool",
+      "primary_genre": "Action",
+      "secondary_genre": "Comedy / Sci-Fi",
+      "release_year": 2016,
+      "imdb_rating": 8.0
+    },
+    {
+      "doc_id": "dunkirk_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/dunkirk_synopsis.json",
+      "movie": "Dunkirk",
+      "primary_genre": "War",
+      "secondary_genre": "Drama / History",
+      "release_year": 2017,
+      "imdb_rating": 7.8
+    },
+    {
+      "doc_id": "ford_ferrari_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/ford_ferrari_synopsis.json",
+      "movie": "Ford Ferrari"
+    },
+    {
+      "doc_id": "how_to_train_dragon_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/how_to_train_dragon_synopsis.json",
+      "movie": "How To Train Dragon"
+    },
+    {
+      "doc_id": "inside_out_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/inside_out_synopsis.json",
+      "movie": "Inside Out",
+      "primary_genre": "Animation",
+      "secondary_genre": "Comedy / Drama",
+      "release_year": 2015,
+      "imdb_rating": 8.1
+    },
+    {
+      "doc_id": "interstellar_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/interstellar_synopsis.json",
+      "movie": "Interstellar",
+      "primary_genre": "Sci-Fi",
+      "secondary_genre": "Drama / Adventure",
+      "release_year": 2014,
+      "imdb_rating": 8.7
+    },
+    {
+      "doc_id": "la_la_land_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/la_la_land_synopsis.json",
+      "movie": "La La Land",
+      "primary_genre": "Musical",
+      "secondary_genre": "Romance / Drama",
+      "release_year": 2016,
+      "imdb_rating": 8.0
+    },
+    {
+      "doc_id": "lion_king_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/lion_king_synopsis.json",
+      "movie": "Lion King"
+    },
+    {
+      "doc_id": "tenet_synopsis",
+      "doc_type": "synopses",
+      "pages": 1,
+      "source_path": "docs/synopses/json/tenet_synopsis.json",
+      "movie": "Tenet",
+      "primary_genre": "Action",
+      "secondary_genre": "Sci-Fi / Thriller",
+      "release_year": 2020,
+      "imdb_rating": 7.3
+    }
+  ],
+  "total_pages": 60
+}

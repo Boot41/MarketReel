@@ -1,0 +1,10 @@
+[
+  {"name": "Drama"},
+  {"name": "Thriller"},
+  {"name": "Comedy"},
+  {"name": "Sci-Fi"},
+  {"name": "Romance"},
+  {"name": "Action"},
+  {"name": "Documentary"},
+  {"name": "Horror"}
+]

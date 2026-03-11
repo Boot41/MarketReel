@@ -1,0 +1,18 @@
+[
+  {"territory": "United States", "license_type": "SVOD", "window_months": 12, "price_min_usd": 800000, "price_max_usd": 1600000},
+  {"territory": "United States", "license_type": "TVOD", "window_months": 6, "price_min_usd": 280000, "price_max_usd": 520000},
+  {"territory": "Canada", "license_type": "SVOD", "window_months": 12, "price_min_usd": 180000, "price_max_usd": 360000},
+  {"territory": "Canada", "license_type": "TVOD", "window_months": 6, "price_min_usd": 70000, "price_max_usd": 130000},
+  {"territory": "United Kingdom", "license_type": "SVOD", "window_months": 12, "price_min_usd": 420000, "price_max_usd": 820000},
+  {"territory": "United Kingdom", "license_type": "TVOD", "window_months": 6, "price_min_usd": 140000, "price_max_usd": 260000},
+  {"territory": "France", "license_type": "SVOD", "window_months": 12, "price_min_usd": 350000, "price_max_usd": 700000},
+  {"territory": "France", "license_type": "TVOD", "window_months": 6, "price_min_usd": 120000, "price_max_usd": 230000},
+  {"territory": "Germany", "license_type": "SVOD", "window_months": 12, "price_min_usd": 330000, "price_max_usd": 680000},
+  {"territory": "Germany", "license_type": "TVOD", "window_months": 6, "price_min_usd": 110000, "price_max_usd": 220000},
+  {"territory": "South Korea", "license_type": "SVOD", "window_months": 12, "price_min_usd": 260000, "price_max_usd": 520000},
+  {"territory": "South Korea", "license_type": "TVOD", "window_months": 6, "price_min_usd": 90000, "price_max_usd": 180000},
+  {"territory": "Japan", "license_type": "SVOD", "window_months": 12, "price_min_usd": 300000, "price_max_usd": 640000},
+  {"territory": "Japan", "license_type": "TVOD", "window_months": 6, "price_min_usd": 100000, "price_max_usd": 200000},
+  {"territory": "Brazil", "license_type": "SVOD", "window_months": 12, "price_min_usd": 140000, "price_max_usd": 280000},
+  {"territory": "Brazil", "license_type": "TVOD", "window_months": 6, "price_min_usd": 60000, "price_max_usd": 120000}
+]

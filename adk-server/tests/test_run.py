@@ -9,7 +9,7 @@ from httpx import ASGITransport, AsyncClient
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app import agent  # noqa: E402
+from agents.marketlogic import agent  # noqa: E402
 from app import main  # noqa: E402
 
 
