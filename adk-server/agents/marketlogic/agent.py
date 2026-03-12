@@ -140,7 +140,7 @@ async def run_agent(
                 author, is_final, part_types, session.id,
             )
 
-            if is_final and event.content:
+            if is_final and author == root_agent.name and event.content:
                 text = _content_text(event.content)
                 if text:
                     final_text = text
@@ -149,6 +149,13 @@ async def run_agent(
                         "adk_final_event_no_text author={} part_types={} session_id={}",
                         author, part_types, session.id,
                     )
+            elif is_final and author != root_agent.name and event.content:
+                # Sub-agent marked its output as final (agent-transfer pattern).
+                # Do not capture — wait for the orchestrator to synthesise and reply.
+                logger.debug(
+                    "adk_sub_agent_final_skipped author={} session_id={}",
+                    author, session.id,
+                )
             elif has_content and author == root_agent.name:
                 # Fallback: capture last text from root agent even if
                 # is_final_response() never fires with text content

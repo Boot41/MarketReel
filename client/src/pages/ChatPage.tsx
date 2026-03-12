@@ -40,234 +40,269 @@ function parseAssistantPayload(content: string): ParsedAssistantPayload | null {
 }
 
 interface ScoreCardData {
-  projected_revenue_by_territory?: Record<string, number>;
-  risk_flags?: Array<{
-    category: string;
-    severity: string;
-    scene_ref?: string;
-    source_ref?: string;
-    mitigation?: string;
-    confidence?: number;
-  }>;
-  recommended_acquisition_price?: number;
-  release_timeline?: {
-    release_mode?: string;
-    theatrical_window_days?: number;
-  };
-  marketing_spend_usd?: number;
-  platform_priority?: string[];
-  roi_scenarios?: Record<string, number>;
-  citations?: Array<{
-    source_path?: string;
-    doc_id?: string;
-    page?: number | null;
-    excerpt?: string;
-  }>;
-  confidence?: number;
-  warnings?: string[];
-  evidence_basis?: string;
-  degraded_mode?: { enabled?: boolean; reason_code?: string | null };
+  // Orchestrator-formatted fields
+  film?: string;
+  intent?: string;
+  mg_recommendation?: { low_usd?: number; mid_usd?: number; high_usd?: number; rationale?: string };
+  release_strategy?: { recommended_window?: string; notes?: string };
+  comparable_films?: Array<{ title: string; territory_gross_usd: number }>;
+  confidence_warning?: string | null;
+  data_sufficiency_score?: number;
+  citations?: Array<{ claim?: string; source_document?: string; page_or_chunk?: string; retrieved_by?: string }>;
+  // ValuationAgent direct fields
+  movie_id?: string;
+  mg_estimate?: { low?: number; mid?: number; high?: number; confidence?: number; currency_code?: string; currency_usd?: number };
+  theatrical_revenue_projection?: { low?: number; mid?: number; high?: number; currency?: string };
+  vod_revenue_projection?: { low?: number; mid?: number; high?: number };
+  comparable_films_used?: Array<{ title: string; territory?: string; mg?: number; similarity_score?: number }>;
+  adjustments_applied?: string[];
+  uncertainty_factors?: string[];
+  sufficiency_note?: string;
+  // Common fields
+  territory?: string;
+  risk_flags?: Array<{ flag?: string; severity?: string }>;
   [key: string]: unknown;
 }
 
 function ScoreCardView({ data }: { data: ScoreCardData }) {
+  const [showUncertainty, setShowUncertainty] = useState(false);
   const [showCitations, setShowCitations] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
 
   const fmt = (n?: number) =>
     n != null ? `$${(n / 1_000_000).toFixed(2)}M` : "—";
-  const pct = (n?: number) =>
-    n != null ? `${Math.round(n * 100)}%` : "—";
-  const severityColor = (s: string): "error" | "warning" | "success" =>
-    s === "HIGH" ? "error" : s === "MEDIUM" ? "warning" : "success";
+  const severityColor = (s?: string): "error" | "warning" | "success" =>
+    s === "high" ? "error" : s === "medium" ? "warning" : "success";
 
-  const territory = Object.keys(data.projected_revenue_by_territory ?? {})[0] ?? "—";
-  const totalRevenue = Object.values(data.projected_revenue_by_territory ?? {})[0];
-  const conf = data.confidence ?? 0;
-  const confColor = conf >= 0.7 ? "success" : conf >= 0.45 ? "warning" : "error";
+  // Normalize: support both orchestrator-formatted and ValuationAgent direct output
+  const filmName = data.film ?? data.movie_id ?? "—";
+  const territory = data.territory ?? "—";
+  const intent = data.intent ?? "valuation";
+
+  const mgLow = data.mg_recommendation?.low_usd ?? data.mg_estimate?.low;
+  const mgMid = data.mg_recommendation?.mid_usd ?? data.mg_estimate?.mid;
+  const mgHigh = data.mg_recommendation?.high_usd ?? data.mg_estimate?.high;
+  const mgRationale = data.mg_recommendation?.rationale;
+  const currencyCode = data.mg_estimate?.currency_code;
+
+  const score = data.data_sufficiency_score ?? data.mg_estimate?.confidence ?? 0;
+  const scoreColor = score >= 0.6 ? "success" : score >= 0.4 ? "warning" : "error";
+
+  const theatricalProj = data.theatrical_revenue_projection;
+  const vodProj = data.vod_revenue_projection;
+  const comparables = data.comparable_films ?? data.comparable_films_used ?? [];
+  const riskFlags = data.risk_flags ?? [];
+  const uncertaintyFactors = data.uncertainty_factors ?? [];
+  const adjustmentsApplied = data.adjustments_applied ?? [];
+  const citations = data.citations ?? [];
 
   return (
-    <Box sx={{ width: "100%", maxWidth: 600 }}>
-      {data.degraded_mode?.enabled && (
-        <Alert severity="warning" sx={{ mb: 1, fontSize: "0.8rem" }}>
-          Benchmark-derived estimate — limited market data
-          {data.degraded_mode.reason_code ? ` (${data.degraded_mode.reason_code})` : ""}
-        </Alert>
-      )}
-      {(data.warnings ?? []).map((w, i) => (
-        <Alert severity="info" sx={{ mb: 1, fontSize: "0.75rem" }} key={i}>
-          {w}
-        </Alert>
-      ))}
-
-      {/* Revenue & Acquisition */}
-      <Card sx={{ mb: 1.5 }}>
-        <CardContent sx={{ pb: "12px !important" }}>
-          <Typography variant="overline" color="text.secondary" fontSize="0.65rem">
-            {territory} — Revenue Forecast
-          </Typography>
-          <Stack direction="row" spacing={3} mt={0.5} flexWrap="wrap">
-            <Box>
-              <Typography variant="caption" color="text.secondary" display="block">Total Revenue</Typography>
-              <Typography variant="h6" fontSize="1.1rem">{fmt(totalRevenue)}</Typography>
-            </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" display="block">Recommended MG</Typography>
-              <Typography variant="h6" fontSize="1.1rem">{fmt(data.recommended_acquisition_price)}</Typography>
-            </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" display="block">Marketing Budget</Typography>
-              <Typography variant="h6" fontSize="1.1rem">{fmt(data.marketing_spend_usd)}</Typography>
-            </Box>
+    <Card variant="outlined" sx={{ minWidth: 320, maxWidth: 640 }}>
+      <CardContent>
+        <Stack spacing={2}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">{filmName}</Typography>
+            <Chip label={territory} size="small" variant="outlined" />
           </Stack>
-        </CardContent>
-      </Card>
-
-      {/* Confidence bar */}
-      <Box sx={{ mb: 1.5 }}>
-        <Stack direction="row" justifyContent="space-between" mb={0.5}>
           <Typography variant="caption" color="text.secondary">
-            Confidence —{" "}
-            {data.evidence_basis === "grounded" ? "Market-grounded" : "Benchmark-derived"}
+            Intent: {intent}
           </Typography>
-          <Typography variant="caption">{pct(data.confidence)}</Typography>
-        </Stack>
-        <LinearProgress variant="determinate" value={conf * 100} color={confColor} />
-      </Box>
 
-      {/* Release strategy */}
-      <Card sx={{ mb: 1.5 }}>
-        <CardContent sx={{ pb: "12px !important" }}>
-          <Typography variant="overline" color="text.secondary" fontSize="0.65rem">
-            Release Strategy
-          </Typography>
-          <Stack direction="row" spacing={1.5} mt={0.5} flexWrap="wrap" alignItems="center">
-            <Chip
-              label={(data.release_timeline?.release_mode ?? "theatrical_first").replace(/_/g, " ")}
-              color={(data.release_timeline?.release_mode ?? "").includes("streaming") ? "secondary" : "primary"}
-              size="small"
-            />
-            {(data.release_timeline?.theatrical_window_days ?? 0) > 0 && (
-              <Typography variant="body2" color="text.secondary">
-                {data.release_timeline?.theatrical_window_days}d window
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>MG Recommendation</Typography>
+            <Stack direction="row" spacing={2}>
+              <Box textAlign="center">
+                <Typography variant="caption" color="text.secondary">Low</Typography>
+                <Typography variant="body2" fontWeight="bold">{fmt(mgLow)}</Typography>
+              </Box>
+              <Box textAlign="center">
+                <Typography variant="caption" color="text.secondary">Mid</Typography>
+                <Typography variant="body2" fontWeight="bold">{fmt(mgMid)}</Typography>
+              </Box>
+              <Box textAlign="center">
+                <Typography variant="caption" color="text.secondary">High</Typography>
+                <Typography variant="body2" fontWeight="bold">{fmt(mgHigh)}</Typography>
+              </Box>
+            </Stack>
+            {mgRationale && (
+              <Typography variant="body2" mt={1} color="text.secondary">{mgRationale}</Typography>
+            )}
+            {currencyCode && currencyCode !== "USD" && (
+              <Typography variant="caption" color="text.secondary">
+                Currency: {currencyCode}
+                {data.mg_estimate?.currency_usd != null && ` (USD rate: ${data.mg_estimate.currency_usd})`}
               </Typography>
             )}
-          </Stack>
-          {(data.platform_priority ?? []).length > 0 && (
-            <Stack direction="row" spacing={0.75} mt={1} flexWrap="wrap">
-              {(data.platform_priority ?? []).map((p, i) => (
-                <Chip key={i} label={p} size="small" variant="outlined" />
-              ))}
-            </Stack>
+          </Box>
+
+          {(theatricalProj ?? vodProj) && (
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Revenue Projections</Typography>
+              {theatricalProj && (
+                <Stack direction="row" spacing={2} mb={0.5}>
+                  <Typography variant="caption" color="text.secondary" minWidth={70}>Theatrical</Typography>
+                  <Typography variant="caption">{fmt(theatricalProj.low)} – {fmt(theatricalProj.high)}</Typography>
+                  {theatricalProj.currency && theatricalProj.currency !== "USD" && (
+                    <Typography variant="caption" color="text.secondary">({theatricalProj.currency})</Typography>
+                  )}
+                </Stack>
+              )}
+              {vodProj && (
+                <Stack direction="row" spacing={2}>
+                  <Typography variant="caption" color="text.secondary" minWidth={70}>VOD</Typography>
+                  <Typography variant="caption">{fmt(vodProj.low)} – {fmt(vodProj.high)}</Typography>
+                </Stack>
+              )}
+            </Box>
           )}
-          {Object.keys(data.roi_scenarios ?? {}).length > 0 && (
-            <Box mt={1}>
-              <Typography variant="caption" color="text.secondary">ROI Scenarios</Typography>
-              <Stack direction="row" spacing={2} mt={0.25} flexWrap="wrap">
-                {Object.entries(data.roi_scenarios ?? {}).map(([name, val]) => (
-                  <Box key={name}>
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      {name.replace(/_/g, " ")}
+
+          <Box>
+            <Stack direction="row" justifyContent="space-between" mb={0.5}>
+              <Typography variant="caption">Data Sufficiency</Typography>
+              <Typography variant="caption">{(score * 100).toFixed(0)}%</Typography>
+            </Stack>
+            <LinearProgress variant="determinate" value={score * 100} color={scoreColor} />
+            {data.sufficiency_note && (
+              <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                {data.sufficiency_note}
+              </Typography>
+            )}
+          </Box>
+
+          {data.confidence_warning && (
+            <Alert severity="warning" sx={{ py: 0 }}>{data.confidence_warning}</Alert>
+          )}
+
+          {data.release_strategy && (
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Release Strategy</Typography>
+              {data.release_strategy.recommended_window && (
+                <Chip label={data.release_strategy.recommended_window} size="small" sx={{ mr: 1 }} />
+              )}
+              {data.release_strategy.notes && (
+                <Typography variant="body2" mt={0.5} color="text.secondary">
+                  {data.release_strategy.notes}
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {comparables.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Comparable Films</Typography>
+              <Stack spacing={0.5}>
+                {comparables.map((c, i) => (
+                  <Stack key={i} direction="row" justifyContent="space-between">
+                    <Typography variant="body2">{c.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {"territory_gross_usd" in c
+                        ? fmt((c as { territory_gross_usd: number }).territory_gross_usd)
+                        : "mg" in c && (c as { mg?: number }).mg != null
+                        ? fmt((c as { mg: number }).mg)
+                        : "—"}
                     </Typography>
-                    <Typography variant="body2" fontWeight="medium">{pct(val)}</Typography>
-                  </Box>
+                  </Stack>
                 ))}
               </Stack>
             </Box>
           )}
-        </CardContent>
-      </Card>
 
-      {/* Risk flags */}
-      {(data.risk_flags ?? []).length > 0 && (
-        <Card sx={{ mb: 1.5 }}>
-          <CardContent sx={{ pb: "12px !important" }}>
-            <Typography variant="overline" color="text.secondary" fontSize="0.65rem">
-              Risk Flags
-            </Typography>
-            <Stack spacing={0.75} mt={0.5}>
-              {(data.risk_flags ?? []).map((flag, i) => (
-                <Box key={i} display="flex" alignItems="flex-start" gap={1}>
+          {riskFlags.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Risk Flags</Typography>
+              <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                {riskFlags.map((r, i) => (
                   <Chip
-                    label={flag.severity}
-                    color={severityColor(flag.severity)}
+                    key={i}
+                    label={r.flag ?? "—"}
                     size="small"
-                    sx={{ minWidth: 58, mt: 0.15 }}
+                    color={severityColor(r.severity)}
+                    variant="outlined"
                   />
-                  <Box>
-                    <Typography variant="body2" fontWeight="medium" fontSize="0.83rem">
-                      {flag.category.replace(/_/g, " ")}
-                    </Typography>
-                    {flag.mitigation && (
-                      <Typography variant="caption" color="text.secondary">
-                        {flag.mitigation}
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Citations */}
-      {(data.citations ?? []).length > 0 && (
-        <Box sx={{ mb: 0.75 }}>
-          <Button
-            size="small"
-            variant="text"
-            onClick={() => setShowCitations(!showCitations)}
-            sx={{ p: 0, textTransform: "none", color: "text.secondary", fontSize: "0.75rem" }}
-          >
-            {showCitations ? "Hide" : "Show"} {(data.citations ?? []).length} source
-            {(data.citations ?? []).length !== 1 ? "s" : ""}
-          </Button>
-          {showCitations && (
-            <Box mt={0.75} pl={1.5} borderLeft="2px solid" borderColor="divider">
-              {(data.citations ?? []).slice(0, 8).map((c, i) => (
-                <Box key={i} sx={{ mb: 0.75 }}>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    {c.doc_id ?? c.source_path}
-                    {c.page != null ? ` — p.${c.page}` : ""}
-                  </Typography>
-                  {c.excerpt && (
-                    <Typography variant="caption" color="text.primary">
-                      {c.excerpt.slice(0, 180)}…
-                    </Typography>
-                  )}
-                </Box>
-              ))}
+                ))}
+              </Stack>
             </Box>
           )}
-        </Box>
-      )}
 
-      {/* Raw JSON toggle */}
-      <Button
-        size="small"
-        variant="text"
-        onClick={() => setShowRaw(!showRaw)}
-        sx={{ p: 0, textTransform: "none", color: "text.disabled", fontSize: "0.68rem" }}
-      >
-        {showRaw ? "Hide" : "View"} raw JSON
-      </Button>
-      {showRaw && (
-        <Typography
-          variant="body2"
-          component="pre"
-          sx={{
-            mt: 0.5,
-            fontSize: "0.62rem",
-            whiteSpace: "pre-wrap",
-            fontFamily: "monospace",
-            color: "text.secondary",
-          }}
-        >
-          {JSON.stringify(data, null, 2)}
-        </Typography>
-      )}
-    </Box>
+          {(uncertaintyFactors.length > 0 || adjustmentsApplied.length > 0) && (
+            <Box>
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setShowUncertainty((v) => !v)}
+                sx={{ px: 0, textTransform: "none" }}
+              >
+                {showUncertainty ? "Hide" : "Show"} uncertainty & adjustments
+              </Button>
+              {showUncertainty && (
+                <Stack spacing={1} mt={1}>
+                  {uncertaintyFactors.length > 0 && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Uncertainty factors</Typography>
+                      {uncertaintyFactors.map((u, i) => (
+                        <Typography key={i} variant="body2">• {u}</Typography>
+                      ))}
+                    </Box>
+                  )}
+                  {adjustmentsApplied.length > 0 && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Adjustments applied</Typography>
+                      {adjustmentsApplied.map((a, i) => (
+                        <Typography key={i} variant="body2">• {a}</Typography>
+                      ))}
+                    </Box>
+                  )}
+                </Stack>
+              )}
+            </Box>
+          )}
+
+          {citations.length > 0 && (
+            <Box>
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setShowCitations((v) => !v)}
+                sx={{ px: 0, textTransform: "none" }}
+              >
+                {showCitations ? "Hide" : "Show"} citations ({citations.length})
+              </Button>
+              {showCitations && (
+                <Stack spacing={0.5} mt={1}>
+                  {citations.map((c, i) => (
+                    <Box key={i}>
+                      <Typography variant="caption" display="block">{c.claim}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {c.source_document}{c.page_or_chunk ? ` · ${c.page_or_chunk}` : ""}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+          )}
+
+          <Box>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => setShowRaw((v) => !v)}
+              sx={{ px: 0, textTransform: "none" }}
+            >
+              {showRaw ? "Hide" : "Show"} raw data
+            </Button>
+            {showRaw && (
+              <Box
+                component="pre"
+                sx={{ fontSize: 11, overflowX: "auto", mt: 1, p: 1, bgcolor: "grey.900", borderRadius: 1 }}
+              >
+                {JSON.stringify(data, null, 2)}
+              </Box>
+            )}
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -429,7 +464,10 @@ function ChatPage() {
                     if (!payload) {
                       return <Typography variant="body1">{message.content}</Typography>;
                     }
-                    if (payload.response_type === "scorecard_response") {
+                    if (
+                      typeof (payload.film ?? payload.movie_id) === "string" &&
+                      (payload.mg_recommendation != null || payload.mg_estimate != null || payload.risk_flags != null || payload.release_strategy != null)
+                    ) {
                       return <ScoreCardView data={payload as ScoreCardData} />;
                     }
                     return <Typography variant="body1">{String(payload.message ?? message.content)}</Typography>;
