@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 import time
-from contextvars import ContextVar
-
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -10,12 +10,11 @@ import httpx
 from loguru import logger
 
 from app.core.config import get_settings
-from .types import Citation, Scorecard, ValidationReport
 
 settings = get_settings()
-_tool_diagnostics_var: ContextVar[list[dict[str, Any]]] = ContextVar(
-    "tool_diagnostics", default=[]
-)
+
+_PAGE_INDEX_PATH = Path(__file__).resolve().parent.parent.parent / "docs" / "page_index"
+_SCRIPTS_INDEX_PATH = Path(__file__).resolve().parent.parent.parent / "docs" / "scripts_indexed"
 
 
 def _normalize(value: str) -> str:
@@ -33,15 +32,6 @@ def _backend_headers() -> dict[str, str]:
     }
 
 
-def reset_tool_diagnostics() -> None:
-    _tool_diagnostics_var.set([])
-
-
-def get_tool_diagnostics() -> list[dict[str, Any]]:
-    diagnostics = _tool_diagnostics_var.get()
-    return [dict(item) for item in diagnostics]
-
-
 def _record_tool_failure(
     *,
     source: str,
@@ -50,17 +40,6 @@ def _record_tool_failure(
     status_code: int | None = None,
     message: str | None = None,
 ) -> None:
-    diagnostics = list(_tool_diagnostics_var.get())
-    diagnostics.append(
-        {
-            "source": source,
-            "error_type": error_type,
-            "endpoint": endpoint,
-            "status_code": status_code,
-            "message": message or "",
-        }
-    )
-    _tool_diagnostics_var.set(diagnostics)
     logger.warning(
         "tool_call_failed source={} endpoint={} error_type={} status_code={} message={}",
         source,
@@ -166,72 +145,6 @@ async def _request_json(
     return {}
 
 
-def _request_json_sync(
-    method: str,
-    path: str,
-    *,
-    params: dict[str, Any] | None = None,
-    payload: dict[str, Any] | None = None,
-) -> Any:
-    base_url = settings.backend_base_url.rstrip("/")
-    timeout = float(settings.internal_api_timeout_sec)
-
-    last_exception: Exception | None = None
-    for delay in _retry_delays():
-        if delay > 0:
-            time.sleep(delay)
-        try:
-            with httpx.Client(base_url=base_url, timeout=timeout) as client:
-                response = client.request(
-                    method,
-                    path,
-                    params=params,
-                    json=payload,
-                    headers=_backend_headers(),
-                )
-            if response.is_success:
-                return response.json()
-            if not _should_retry(None, response.status_code):
-                _record_tool_failure(
-                    source="docs",
-                    endpoint=path,
-                    error_type=_classify_status_error(response.status_code),
-                    status_code=response.status_code,
-                    message=f"http_{response.status_code}",
-                )
-                return {}
-            last_exception = RuntimeError(f"backend_status_{response.status_code}")
-        except Exception as exc:
-            if not _should_retry(exc, None):
-                _record_tool_failure(
-                    source="docs",
-                    endpoint=path,
-                    error_type=_classify_exception(exc),
-                    message=str(exc),
-                )
-                return {}
-            last_exception = exc
-    if last_exception is not None:
-        if isinstance(last_exception, RuntimeError) and "backend_status_" in str(last_exception):
-            status_code = int(str(last_exception).split("_")[-1])
-            _record_tool_failure(
-                source="docs",
-                endpoint=path,
-                error_type=_classify_status_error(status_code),
-                status_code=status_code,
-                message=str(last_exception),
-            )
-        else:
-            _record_tool_failure(
-                source="docs",
-                endpoint=path,
-                error_type=_classify_exception(last_exception),
-                message=str(last_exception),
-            )
-        return {}
-    return {}
-
-
 async def _sleep(seconds: float) -> None:
     if seconds <= 0:
         return
@@ -240,107 +153,246 @@ async def _sleep(seconds: float) -> None:
     await asyncio.sleep(seconds)
 
 
-_registry_cache: dict[str, Any] | None = None
+def index_registry(movie: str, territory: str) -> dict[str, Any]:
+    """Return the document catalog for the given movie and territory.
 
+    Reads local index manifests to show what evidence is available before
+    building a retrieval plan. Always call this first.
 
-def IndexRegistry() -> dict[str, Any]:
-    """Fetch known movies and territories from backend registry.
-
-    Caches the result on first successful fetch. Returns ``_unavailable=True``
-    when the backend is unreachable or returns no data — the result is NOT
-    cached in that case so the next request will retry.
+    Args:
+        movie: Film name or identifier (e.g. "deadpool", "interstellar").
+        territory: Target distribution territory (e.g. "india", "saudi_arabia").
     """
-    global _registry_cache
-    if _registry_cache is not None:
-        return _registry_cache
-    payload = _request_json_sync("GET", "/internal/v1/meta/registry")
-    if isinstance(payload, dict) and payload.get("known_movies"):
-        _registry_cache = payload
-        return _registry_cache
-    logger.warning("index_registry_unavailable backend_not_reachable_or_returned_no_data")
+    movie_slug = _normalize(movie).replace(" ", "_")
+    territory_slug = _normalize(territory).replace(" ", "_")
+    available_docs: list[dict[str, Any]] = []
+    known_movies: list[str] = []
+    known_territories: list[str] = []
+
+    try:
+        manifest = json.loads((_PAGE_INDEX_PATH / "manifest.json").read_text(encoding="utf-8"))
+        for doc in manifest.get("documents", []):
+            doc_id = _normalize(str(doc.get("doc_id", ""))).replace(" ", "_")
+            doc_type = str(doc.get("doc_type", ""))
+            if doc_type == "censorship_guidelines_countries":
+                slug = doc_id.replace("censorship_guidelines_", "")
+                if slug not in known_territories:
+                    known_territories.append(slug)
+                if territory_slug and territory_slug in doc_id:
+                    available_docs.append(doc)
+            else:
+                doc_movie = _normalize(str(doc.get("movie", ""))).replace(" ", "_")
+                base = doc_id
+                for suffix in ("_censorship_guidelines", "_censorship", "_cultural_sensitivity",
+                               "_synopsis", "_synopses", "_reviews", "_marketing"):
+                    base = base.replace(suffix, "")
+                if base and base not in known_movies:
+                    known_movies.append(base)
+                if movie_slug and (movie_slug in doc_id or movie_slug in doc_movie):
+                    available_docs.append(doc)
+    except Exception as exc:
+        logger.warning("index_registry_page_index_error error={}", exc)
+
+    try:
+        scene_manifest = json.loads(
+            (_SCRIPTS_INDEX_PATH / "scene_manifest.json").read_text(encoding="utf-8")
+        )
+        for entry in scene_manifest.get("scripts", []):
+            em = _normalize(str(entry.get("movie", ""))).replace(" ", "_")
+            if em and em not in known_movies:
+                known_movies.append(em)
+            doc_id = _normalize(str(entry.get("doc_id", ""))).replace(" ", "_")
+            if movie_slug and (movie_slug in em or movie_slug in doc_id):
+                available_docs.append({
+                    "doc_id": entry.get("doc_id"),
+                    "doc_type": "script_scenes",
+                    "movie": entry.get("movie"),
+                    "scene_count": entry.get("scenes", 0),
+                    "source_path": entry.get("source_path", ""),
+                })
+    except Exception as exc:
+        logger.warning("index_registry_scene_manifest_error error={}", exc)
+
     return {
-        "page_index_manifest": {"documents": []},
-        "scene_manifest": {"scripts": []},
-        "known_movies": [],
-        "known_territories": [],
-        "_unavailable": True,
+        "available_docs": available_docs,
+        "movie_slug": movie_slug,
+        "territory_slug": territory_slug,
+        "known_movies": sorted(known_movies),
+        "known_territories": sorted(known_territories),
     }
 
 
-def IndexNavigator(movie: str, territory: str, intent: str) -> dict[str, Any]:
-    """Build a deterministic retrieval plan from known indexes."""
-    intent_key = _normalize(intent)
-    doc_types = ["synopses", "reviews", "marketing"]
-    if intent_key in {"risk", "full_scorecard"}:
+def index_navigator(movie: str, territory: str, retrieval_intent: str) -> dict[str, Any]:
+    """Build a targeted retrieval plan for the given movie, territory, and intent.
+
+    Returns a plan with recommended doc_types, max_docs, and max_scenes. Pass
+    these fields directly to targeted_fetcher.
+
+    Args:
+        movie: Film name or identifier.
+        territory: Target distribution territory.
+        retrieval_intent: Plain-language retrieval goal — e.g. "censorship risk
+            for saudi arabia", "valuation evidence", "full_scorecard",
+            "reviews and sentiment".
+    """
+    intent_key = _normalize(retrieval_intent).replace(" ", "_")
+    doc_types: list[str] = ["synopses", "reviews", "marketing"]
+    if any(k in intent_key for k in ("risk", "censorship", "full_scorecard", "cultural")):
         doc_types.extend(["cultural_sensitivity", "censorship", "censorship_guidelines_countries"])
-    if intent_key in {"strategy", "full_scorecard"}:
-        doc_types.append("scripts")
+    if any(k in intent_key for k in ("valuation", "full_scorecard", "script", "scene")):
+        doc_types.append("script_scenes")
+
+    max_docs = 12 if "full_scorecard" in intent_key else 8
+    max_scenes = 8 if any(
+        k in intent_key for k in ("risk", "censorship", "valuation", "full_scorecard")
+    ) else 4
 
     return {
         "movie": movie,
         "territory": territory,
-        "intent": intent,
+        "retrieval_intent": retrieval_intent,
         "doc_types": sorted(set(doc_types)),
-        "max_docs": 10,
-        "max_scenes": 6,
+        "max_docs": max_docs,
+        "max_scenes": max_scenes,
     }
 
 
-def TargetedFetcher(plan: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
-    """Fetch targeted page/scene chunks via backend internal docs endpoint."""
-    payload = _request_json_sync(
-        "POST",
-        "/internal/v1/docs/search",
-        payload={
-            "movie": str(plan.get("movie", "")),
-            "territory": str(plan.get("territory", "")),
-            "intent": str(plan.get("intent", "full_scorecard")),
-            "doc_types": [str(item) for item in plan.get("doc_types", [])],
-            "max_docs": int(plan.get("max_docs", 10)),
-            "max_scenes": int(plan.get("max_scenes", 6)),
-        },
-    )
-    if not isinstance(payload, dict):
-        return {"documents": [], "scenes": []}
+def targeted_fetcher(
+    movie: str,
+    territory: str,
+    doc_types: list[str],
+    max_docs: int = 10,
+    max_scenes: int = 6,
+) -> dict[str, Any]:
+    """Fetch documents and scenes from the local corpus for a movie and territory.
 
-    documents = payload.get("documents")
-    scenes = payload.get("scenes")
-    if not isinstance(documents, list) or not isinstance(scenes, list):
-        return {"documents": [], "scenes": []}
+    Reads docs/page_index/pages.jsonl for document types (synopses, reviews,
+    marketing, censorship, cultural_sensitivity) and
+    docs/scripts_indexed/scenes.jsonl for script scenes. Returns matched items
+    with source references attached.
+
+    Args:
+        movie: Film name to retrieve documents for.
+        territory: Territory used to filter censorship_guidelines_countries docs.
+        doc_types: Document types to fetch. Valid values: "synopses", "reviews",
+            "marketing", "censorship", "censorship_guidelines_countries",
+            "cultural_sensitivity", "script_scenes".
+        max_docs: Maximum page-level documents to return (default 10).
+        max_scenes: Maximum script scenes to return (default 6).
+    """
+    movie_slug = _normalize(movie).replace(" ", "_")
+    territory_slug = _normalize(territory).replace(" ", "_")
+    type_set = {_normalize(t).replace(" ", "_") for t in (doc_types or [])}
+
+    documents: list[dict[str, Any]] = []
+    scenes: list[dict[str, Any]] = []
+
+    page_types = type_set - {"script_scenes"}
+    if page_types:
+        try:
+            with (_PAGE_INDEX_PATH / "pages.jsonl").open(encoding="utf-8") as fh:
+                for raw in fh:
+                    if len(documents) >= max_docs:
+                        break
+                    try:
+                        item = json.loads(raw)
+                    except Exception:
+                        continue
+                    doc_type = _normalize(str(item.get("doc_type", ""))).replace(" ", "_")
+                    if doc_type not in page_types:
+                        continue
+                    doc_id = _normalize(str(item.get("doc_id", ""))).replace(" ", "_")
+                    if doc_type == "censorship_guidelines_countries":
+                        if territory_slug and territory_slug not in doc_id:
+                            continue
+                    else:
+                        doc_movie = _normalize(str(item.get("movie", ""))).replace(" ", "_")
+                        if movie_slug and movie_slug not in doc_id and movie_slug not in doc_movie:
+                            continue
+                    documents.append({
+                        "doc_id": item.get("doc_id"),
+                        "doc_type": item.get("doc_type"),
+                        "page": item.get("page"),
+                        "content": str(item.get("text", ""))[:2000],
+                        "movie": item.get("movie"),
+                        "source_reference": str(item.get("source_path", "")),
+                    })
+        except Exception as exc:
+            logger.warning("targeted_fetcher_page_index_error error={}", exc)
+
+    if "script_scenes" in type_set:
+        try:
+            with (_SCRIPTS_INDEX_PATH / "scenes.jsonl").open(encoding="utf-8") as fh:
+                for raw in fh:
+                    if len(scenes) >= max_scenes:
+                        break
+                    try:
+                        item = json.loads(raw)
+                    except Exception:
+                        continue
+                    item_movie = _normalize(str(item.get("movie", ""))).replace(" ", "_")
+                    doc_id = _normalize(str(item.get("doc_id", ""))).replace(" ", "_")
+                    if movie_slug and movie_slug not in item_movie and movie_slug not in doc_id:
+                        continue
+                    scenes.append({
+                        "doc_id": item.get("doc_id"),
+                        "scene_title": item.get("scene_title"),
+                        "start_page": item.get("start_page"),
+                        "end_page": item.get("end_page"),
+                        "content": str(item.get("text", ""))[:2000],
+                        "movie": item.get("movie"),
+                        "source_reference": str(item.get("source_path", "")),
+                    })
+        except Exception as exc:
+            logger.warning("targeted_fetcher_scenes_error error={}", exc)
 
     return {
-        "documents": [item for item in documents if isinstance(item, dict)],
-        "scenes": [item for item in scenes if isinstance(item, dict)],
+        "documents": documents,
+        "scenes": scenes,
+        "total_documents": len(documents),
+        "total_scenes": len(scenes),
     }
 
 
-def SufficiencyChecker(fetched: dict[str, list[dict[str, Any]]], min_items: int = 4) -> dict[str, Any]:
-    """Check if retrieval result is sufficient for downstream reasoning."""
-    documents = fetched.get("documents", [])
-    scenes = fetched.get("scenes", [])
-    total = len(documents) + len(scenes)
+def sufficiency_checker(
+    total_documents: int,
+    total_scenes: int,
+    retrieval_intent: str,
+) -> dict[str, Any]:
+    """Check if retrieved evidence meets the threshold for the retrieval intent.
+
+    Call this after targeted_fetcher using the total_documents and total_scenes
+    counts from that result. Returns PASS or EXPAND with guidance on next steps.
+
+    Args:
+        total_documents: Number of documents returned by targeted_fetcher.
+        total_scenes: Number of script scenes returned by targeted_fetcher.
+        retrieval_intent: The same intent string passed to index_navigator.
+    """
+    intent_key = _normalize(retrieval_intent)
+    total = total_documents + total_scenes
+    if "risk" in intent_key or "censorship" in intent_key:
+        min_items = 5
+    elif "full_scorecard" in intent_key:
+        min_items = 8
+    else:
+        min_items = 3
+
     score = min(1.0, total / float(max(1, min_items * 2)))
     status = "PASS" if total >= min_items else "EXPAND"
-    return {"status": status, "score": round(score, 3), "total_items": total}
-
-
-def _citation_from_record(item: dict[str, Any]) -> Citation:
-    excerpt = str(item.get("text", "")).strip()
+    guidance = (
+        f"Only {total} items retrieved; {min_items} required. "
+        "Call targeted_fetcher again with max_docs increased by 6 and max_scenes by 4."
+        if status == "EXPAND"
+        else ""
+    )
     return {
-        "source_path": str(item.get("source_path", "")),
-        "doc_id": str(item.get("doc_id", "")),
-        "page": item.get("page") if isinstance(item.get("page"), int) else item.get("start_page"),
-        "excerpt": excerpt[:220],
+        "status": status,
+        "score": round(score, 3),
+        "total_items": total,
+        "min_required": min_items,
+        "guidance": guidance,
     }
-
-
-def source_citation_tool(items: list[dict[str, Any]], limit: int = 12) -> list[Citation]:
-    citations: list[Citation] = []
-    for item in items:
-        citations.append(_citation_from_record(item))
-        if len(citations) >= limit:
-            break
-    return citations
 
 
 async def get_box_office_by_genre_territory(movie: str, territory: str) -> dict[str, Any]:
@@ -458,81 +510,3 @@ def exchange_rate_tool(amount_usd: float, rate_to_usd: float) -> float:
     if rate_to_usd <= 0:
         return round(amount_usd, 2)
     return round(amount_usd / rate_to_usd, 2)
-
-
-def financial_sanity_check(
-    mg_estimate_usd: float,
-    theatrical_projection_usd: float,
-    vod_projection_usd: float,
-) -> bool:
-    projected_total = theatrical_projection_usd + vod_projection_usd
-    if projected_total <= 0:
-        return False
-    return mg_estimate_usd <= projected_total * 0.7
-
-
-def hallucination_check(citations: list[Citation], min_citations: int = 3) -> bool:
-    present = [item for item in citations if item.get("source_path")]
-    return len(present) >= min_citations
-
-
-def confidence_threshold_check(confidence: float, threshold: float = 0.55) -> bool:
-    return confidence >= threshold
-
-
-def format_scorecard(
-    territory: str,
-    theatrical_projection_usd: float,
-    vod_projection_usd: float,
-    acquisition_price_usd: float,
-    release_mode: str,
-    release_window_days: int,
-    marketing_spend_usd: float,
-    platform_priority: list[str],
-    roi_scenarios: dict[str, float],
-    risk_flags: list[dict[str, Any]],
-    citations: list[Citation],
-    confidence: float,
-    warnings: list[str],
-    evidence_basis: str,
-    degraded_mode: dict[str, Any],
-    response_type: str,
-) -> Scorecard:
-    return {
-        "projected_revenue_by_territory": {
-            territory: round(theatrical_projection_usd + vod_projection_usd, 2)
-        },
-        "risk_flags": risk_flags,
-        "recommended_acquisition_price": round(acquisition_price_usd, 2),
-        "release_timeline": {
-            "release_mode": release_mode,
-            "theatrical_window_days": release_window_days,
-        },
-        "marketing_spend_usd": round(marketing_spend_usd, 2),
-        "platform_priority": platform_priority,
-        "roi_scenarios": roi_scenarios,
-        "citations": citations,
-        "confidence": round(confidence, 3),
-        "warnings": warnings,
-        "evidence_basis": evidence_basis,
-        "degraded_mode": degraded_mode,
-        "response_type": response_type,
-    }
-
-
-def combine_validation_warnings(report: ValidationReport) -> list[str]:
-    warnings = list(report.get("warnings", []))
-    if not report.get("financial_sanity_pass", False):
-        warnings.append("Financial sanity check failed.")
-    if not report.get("hallucination_pass", False):
-        warnings.append("Insufficient citations for one or more claims.")
-    if not report.get("confidence_threshold_pass", False):
-        warnings.append("Overall confidence is below threshold.")
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for warning in warnings:
-        if warning in seen:
-            continue
-        seen.add(warning)
-        deduped.append(warning)
-    return deduped

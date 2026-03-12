@@ -9,10 +9,10 @@ settings = get_settings()
 
 @dataclass(frozen=True)
 class MarketLogicConfiguration:
-    """Runtime configuration for hybrid specialist reasoning."""
+    """Runtime configuration for agent model selection."""
 
     worker_model: str = settings.adk_model
-    schema_retry_limit: int = 1
+    critic_model: str = settings.adk_model
 
 
 config = MarketLogicConfiguration()

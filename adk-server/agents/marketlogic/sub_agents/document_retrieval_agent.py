@@ -1,40 +1,32 @@
 from __future__ import annotations
 
-from typing import Any
+from pathlib import Path
 
-from ..tools import IndexNavigator, SufficiencyChecker, TargetedFetcher
+from google.adk.agents import Agent
+from google.adk.tools import FunctionTool
 
+from ..config import config
+from ..tools import index_navigator, index_registry, sufficiency_checker, targeted_fetcher
 
-class DocumentRetrievalAgent:
-    """Deterministic document retrieval agent over indexed corpus."""
+_PROMPT = (
+    Path(__file__).resolve().parent.parent / "prompts" / "DocumentRetrievalAgent_prompt.txt"
+).read_text(encoding="utf-8").strip()
 
-    @staticmethod
-    def _expand_retrieval_plan(plan: dict[str, Any]) -> dict[str, Any]:
-        expanded = dict(plan)
-        max_docs = int(plan.get("max_docs", 10))
-        max_scenes = int(plan.get("max_scenes", 6))
-        expanded["max_docs"] = min(20, max_docs + 6)
-        expanded["max_scenes"] = min(12, max_scenes + 4)
-        return expanded
-
-    @classmethod
-    async def run(
-        cls,
-        *,
-        movie: str,
-        territory: str,
-        intent: str,
-    ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
-        plan = IndexNavigator(movie=movie, territory=territory, intent=intent)
-        fetched = TargetedFetcher(plan)
-        sufficiency = SufficiencyChecker(fetched)
-
-        if sufficiency.get("status") != "PASS":
-            expanded_plan = cls._expand_retrieval_plan(plan)
-            expanded_fetch = TargetedFetcher(expanded_plan)
-            expanded_sufficiency = SufficiencyChecker(expanded_fetch)
-            if float(expanded_sufficiency.get("score", 0.0)) >= float(sufficiency.get("score", 0.0)):
-                fetched = expanded_fetch
-                sufficiency = expanded_sufficiency
-
-        return fetched, sufficiency
+document_retrieval_agent = Agent(
+    name="DocumentRetrievalAgent",
+    model=config.worker_model,
+    description=(
+        "Index-guided document retrieval sub-agent for MarketReel. Called exclusively by "
+        "DataAgent to fetch script scenes, censorship guidelines, cultural sensitivity "
+        "reports, reviews, marketing briefs, and synopses from the local corpus. Uses "
+        "index_registry → index_navigator → targeted_fetcher → sufficiency_checker."
+    ),
+    instruction=_PROMPT,
+    tools=[
+        FunctionTool(index_registry),
+        FunctionTool(index_navigator),
+        FunctionTool(targeted_fetcher),
+        FunctionTool(sufficiency_checker),
+    ],
+    output_key="retrieved_documents",
+)
